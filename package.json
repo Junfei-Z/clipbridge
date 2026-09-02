@@ -1,6 +1,6 @@
 {
   "name": "clipbridge",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "A lightweight, local-first clipboard bridge for Windows and iPhone.",
   "type": "module",

@@ -6,6 +6,7 @@ ClipBridge is a lightweight, local-first clipboard bridge for Windows and iPhone
 
 - Read the current Windows text clipboard from an iPhone Shortcut.
 - Send text from an iPhone Shortcut directly into the Windows clipboard.
+- Preserve Unicode text, including Chinese, Emoji, accented characters, and line breaks.
 - Pair with a randomly generated 192-bit token.
 - Reject connections that do not come from a private or loopback address.
 - Keep clipboard contents out of logs and persistent storage.

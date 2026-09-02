@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 - 2026-09-02
+
+### Fixed
+
+- Chinese, Emoji, accented characters, and multiline text now survive iPhone-to-Windows clipboard transfers exactly.
+- Windows-to-iPhone clipboard reads now use the same locale-independent UTF-8 transport.
+- PowerShell communication uses Base64-wrapped UTF-8 instead of the active Windows console code page.
+- Windows clipboard access uses the native Unicode text format rather than PowerShell's locale-sensitive clipboard cmdlets.
+
 ## 0.1.2 - 2026-09-01
 
 ### Improved

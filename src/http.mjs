@@ -61,7 +61,7 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
       json(response, 200, {
         ok: true,
         device: config.deviceName,
-        version: "0.1.2",
+        version: "0.1.3",
         ...(instanceId ? { instanceId } : {})
       });
       return;

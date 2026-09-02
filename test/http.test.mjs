@@ -70,7 +70,7 @@ test("reports the runtime instance on the health endpoint", async () => {
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.1.2",
+      version: "0.1.3",
       instanceId: "tray-launch-123"
     });
   } finally {
