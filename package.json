@@ -1,0 +1,15 @@
+{
+  "name": "clipbridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A lightweight, local-first clipboard bridge for Windows and iPhone.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
