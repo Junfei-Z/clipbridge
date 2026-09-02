@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DeviceRegistry } from "../src/devices.mjs";
 import { HistoryStore } from "../src/history.mjs";
+import { InboxStore } from "../src/inbox.mjs";
 import { createClipBridgeServer } from "../src/http.mjs";
 import { PairingManager } from "../src/pairing.mjs";
 
@@ -13,6 +14,7 @@ async function withServer(run) {
   const now = () => Date.parse("2026-09-01T12:00:00Z");
   const devices = new DeviceRegistry({ now });
   const history = new HistoryStore({ now });
+  const inbox = new InboxStore({ now });
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024, port: 39393 },
     clipboard: {
@@ -22,6 +24,7 @@ async function withServer(run) {
     now,
     devices,
     history,
+    inbox,
     pairing: new PairingManager({ now }),
     pairingAddresses: ["192.168.1.23"],
     isLocalRequest: (_address, request) => request.headers["x-clipbridge-test-local"] === "1"
@@ -29,7 +32,7 @@ async function withServer(run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const { port } = server.address();
-    await run(`http://127.0.0.1:${port}`, () => value, { devices, history });
+    await run(`http://127.0.0.1:${port}`, () => value, { devices, history, inbox });
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -169,6 +172,56 @@ test("paired devices can only read and delete their own transfer history", async
   });
 });
 
+test("routes text between paired devices through isolated local inboxes", async () => {
+  await withServer(async (baseUrl, currentValue, { devices, inbox }) => {
+    const iphone = await devices.register({ name: "Junfei 的 iPhone", type: "iphone" });
+    const mac = await devices.register({ name: "Junfei 的 MacBook", type: "mac" });
+    const iphoneAuth = { Authorization: `Bearer ${iphone.token}` };
+    const macAuth = { Authorization: `Bearer ${mac.token}` };
+
+    const peers = await (await fetch(`${baseUrl}/api/v1/peers`, { headers: iphoneAuth })).json();
+    assert.equal(peers.self.id, iphone.device.id);
+    assert.deepEqual(peers.targets.map(({ id }) => id).sort(), ["windows-host", mac.device.id].sort());
+
+    const routedResponse = await fetch(`${baseUrl}/api/v1/transfers`, {
+      method: "POST",
+      headers: { ...iphoneAuth, "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "text", text: "iPhone 发给 Mac 🥳", targetId: mac.device.id })
+    });
+    assert.equal(routedResponse.status, 201);
+    const routed = await routedResponse.json();
+    assert.equal(routed.delivery, "inbox");
+    assert.equal(currentValue(), "from Windows");
+
+    assert.deepEqual((await (await fetch(`${baseUrl}/api/v1/inbox`, { headers: iphoneAuth })).json()).transfers, []);
+    const macInbox = await (await fetch(`${baseUrl}/api/v1/inbox`, { headers: macAuth })).json();
+    assert.equal(macInbox.transfers[0].text, "iPhone 发给 Mac 🥳");
+    assert.equal(macInbox.transfers[0].source.id, iphone.device.id);
+    assert.equal((await fetch(`${baseUrl}/api/v1/inbox/${routed.transfer.id}`, { method: "DELETE", headers: iphoneAuth })).status, 404);
+    assert.equal((await fetch(`${baseUrl}/api/v1/inbox/${routed.transfer.id}`, { method: "DELETE", headers: macAuth })).status, 200);
+
+    const windowsResponse = await fetch(`${baseUrl}/api/v1/transfers`, {
+      method: "POST",
+      headers: { ...iphoneAuth, "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "text", text: "direct to Windows", targetId: "windows-host" })
+    });
+    assert.equal((await windowsResponse.json()).delivery, "clipboard");
+    assert.equal(currentValue(), "direct to Windows");
+
+    const fromWindowsResponse = await fetch(`${baseUrl}/api/v1/transfers`, {
+      method: "POST",
+      headers: { ...LOCAL_HEADERS, "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "text", text: "Windows 发给 Mac", targetId: mac.device.id })
+    });
+    assert.equal(fromWindowsResponse.status, 201);
+    assert.equal((await (await fetch(`${baseUrl}/api/v1/inbox`, { headers: macAuth })).json()).transfers[0].source.id, "windows-host");
+
+    assert.equal((await fetch(`${baseUrl}/api/v1/devices/${mac.device.id}`, { method: "DELETE", headers: LOCAL_HEADERS })).status, 200);
+    assert.deepEqual(inbox.list(mac.device.id), []);
+    assert.equal((await fetch(`${baseUrl}/api/v1/inbox`, { headers: macAuth })).status, 401);
+  });
+});
+
 test("keeps v0.1 bearer links working during migration", async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/session`, {
@@ -178,6 +231,11 @@ test("keeps v0.1 bearer links working during migration", async () => {
     const session = await response.json();
     assert.equal(session.legacy, true);
     assert.equal(session.device.name, "iPhone");
+    const peersResponse = await fetch(`${baseUrl}/api/v1/peers`, {
+      headers: { Authorization: `Bearer ${LEGACY_TOKEN}`, "User-Agent": "Mozilla/5.0 (iPhone)" }
+    });
+    assert.equal(peersResponse.status, 403);
+    assert.equal((await peersResponse.json()).code, "SECURE_PAIRING_REQUIRED");
   });
 });
 
@@ -213,7 +271,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.2.1 and the runtime instance on the health endpoint", async () => {
+test("reports v0.3.0 and the runtime instance on the health endpoint", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -226,7 +284,7 @@ test("reports v0.2.1 and the runtime instance on the health endpoint", async () 
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.2.1",
+      version: "0.3.0",
       instanceId: "tray-launch-123"
     });
   } finally {

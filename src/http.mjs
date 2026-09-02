@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { HistoryStore } from "./history.mjs";
+import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
 import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.2.1";
+const APP_VERSION = "0.3.0";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -87,6 +88,7 @@ export function createClipBridgeServer({
   instanceId = null,
   devices = new DeviceRegistry({ now }),
   history = new HistoryStore({ now }),
+  inbox = new InboxStore({ now }),
   pairing = new PairingManager({ now }),
   pairingAddresses = [],
   isLocalRequest = (address) => isLoopbackAddress(address)
@@ -222,6 +224,7 @@ export function createClipBridgeServer({
           return;
         }
         await devices.revoke(identity.id);
+        await inbox.clear(identity.id);
         json(response, 200, { ok: true });
         return;
       }
@@ -263,6 +266,7 @@ export function createClipBridgeServer({
           json(response, 404, { error: "没有找到这台设备。" });
           return;
         }
+        await inbox.clear(decodeURIComponent(deviceRoute[1]));
         json(response, 200, { ok: true });
         return;
       }
@@ -295,6 +299,90 @@ export function createClipBridgeServer({
           return;
         }
         json(response, 200, { ok: true });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/peers" && request.method === "GET") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "多设备传输需要使用 v0.2 设备配对。", code: "SECURE_PAIRING_REQUIRED" });
+          return;
+        }
+        const peers = [transferEndpoint(localIdentity(config)), ...devices.list().map(transferEndpoint)];
+        json(response, 200, {
+          self: transferEndpoint(identity),
+          targets: peers.filter((peer) => peer.id !== identity.id)
+        });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/transfers" && request.method === "POST") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "多设备传输需要使用 v0.2 设备配对。", code: "SECURE_PAIRING_REQUIRED" });
+          return;
+        }
+        const body = await readJson(request, config.maxTextBytes + 4096);
+        if (body?.kind !== "text" || typeof body.text !== "string" || typeof body.targetId !== "string") {
+          json(response, 400, { error: "Expected { kind: 'text', text: string, targetId: string }." });
+          return;
+        }
+        if (Buffer.byteLength(body.text, "utf8") > config.maxTextBytes) {
+          json(response, 413, { error: `Text exceeds ${config.maxTextBytes} bytes.` });
+          return;
+        }
+        const target = body.targetId === "windows-host"
+          ? transferEndpoint(localIdentity(config))
+          : devices.get(body.targetId);
+        if (!target || target.id === identity.id) {
+          json(response, 404, { error: "没有找到可接收的目标设备。" });
+          return;
+        }
+        const source = transferEndpoint(identity);
+        let transfer;
+        let delivery;
+        if (target.id === "windows-host") {
+          await clipboard.writeText(body.text);
+          transfer = await history.add({ text: body.text, source, target });
+          delivery = "clipboard";
+        } else {
+          transfer = await inbox.deliver({ text: body.text, source, target });
+          await history.add({ text: body.text, source, target });
+          delivery = "inbox";
+        }
+        json(response, 201, { transfer, delivery });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/inbox" && request.method === "GET") {
+        if (identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才有收件箱。" });
+          return;
+        }
+        json(response, 200, { transfers: inbox.list(identity.id) });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/inbox" && request.method === "DELETE") {
+        if (identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才有收件箱。" });
+          return;
+        }
+        const removed = await inbox.clear(identity.id);
+        json(response, 200, { ok: true, removed });
+        return;
+      }
+
+      const inboxRoute = requestUrl.pathname.match(/^\/api\/v1\/inbox\/([^/]+)$/);
+      if (inboxRoute && request.method === "DELETE") {
+        if (identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才有收件箱。" });
+          return;
+        }
+        const transfer = await inbox.consume(decodeURIComponent(inboxRoute[1]), identity.id);
+        if (!transfer) {
+          json(response, 404, { error: "没有找到这条待接收内容。" });
+          return;
+        }
+        json(response, 200, { ok: true, transfer });
         return;
       }
 

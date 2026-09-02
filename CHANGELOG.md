@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 - 2026-09-02
+
+### Added
+
+- Named destination selection for Windows and every securely paired device.
+- A persistent, target-isolated inbox with up to 50 pending text transfers per device.
+- Direct iPhone-to-Mac, Mac-to-iPhone, and Windows-to-device routing through the local Windows hub.
+- Five-second inbox refresh while a paired web app is open, plus copy-and-accept, ignore, and clear controls.
+- Peer discovery and multi-device transfer APIs.
+
+### Security
+
+- A paired device can only inspect and consume its own inbox.
+- Legacy v0.1 shared-token clients remain limited to Windows clipboard compatibility and cannot use multi-device routing.
+- Revoking a device also clears pending content addressed to that device.
+
 ## 0.2.1 - 2026-09-02
 
 ### Added

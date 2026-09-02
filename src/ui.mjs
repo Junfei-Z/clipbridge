@@ -57,6 +57,9 @@ export function renderDashboard({
     label { display: grid; gap: 7px; color: #59647a; font-size: 13px; font-weight: 650; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .form-grid .full { grid-column: 1 / -1; }
+    .destination { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 14px; }
+    .destination button { min-height: 49px; }
+    #send-target { margin-bottom: 14px; }
     .code-input { text-align: center; font: 750 24px/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .22em; }
     .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     button { appearance: none; border: 0; border-radius: 13px; padding: 12px 16px; font: inherit; font-weight: 650; cursor: pointer; transition: transform .12s, opacity .12s, background .12s; }
@@ -98,6 +101,9 @@ export function renderDashboard({
     .history-meta { flex: 0 0 auto; color: #929aac; font-size: 11px; }
     .history-text { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: #273147; font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
     .history-actions { display: flex; justify-content: flex-end; gap: 5px; margin-top: 8px; }
+    .inbox-heading { margin-top: 4px; }
+    .inbox-list { display: grid; gap: 9px; }
+    .inbox-divider { height: 1px; margin: 22px 0; border: 0; background: #eceef3; }
     .empty { padding: 18px 8px; color: #8a93a6; text-align: center; font-size: 13px; }
     .notice { margin-bottom: 16px; padding: 11px 13px; color: #664f18; background: #fff7d8; border: 1px solid #f0df9c; border-radius: 13px; font-size: 12px; line-height: 1.5; }
     .warning { margin-top: 16px; color: #7a6840; background: #fff8df; border: 1px solid #f1df9e; border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; }
@@ -113,6 +119,7 @@ export function renderDashboard({
       .pair-route::before, .pair-route::after { width: 8px; }
       .pair-route span { width: 7px; height: 7px; border-radius: 50%; background: #20b26b; }
       .form-grid { grid-template-columns: 1fr; }
+      .destination { grid-template-columns: 1fr; }
       .form-grid .full { grid-column: auto; }
       .pair-box { grid-template-columns: 1fr; text-align: center; }
       .qr { margin: auto; }
@@ -131,6 +138,7 @@ export function renderDashboard({
       .device-item { border-color: #303744; }
       .history-item { border-color: #303744; background: #151920; }
       .history-text { color: #e6eaf2; }
+      .inbox-divider { background: #303744; }
       .danger { color: #ffb2b2; background: #442626; }
       .notice, .warning { color: #e7d99f; background: #302a18; border-color: #554a27; }
     }
@@ -211,6 +219,10 @@ function renderLocalPanel() {
         <p class="helper">查看当前内容，修改后可以重新保存到 Windows 剪贴板。</p>
       </div>
       <textarea id="local-clip" aria-label="Windows 剪贴板内容" placeholder="正在读取 Windows 剪贴板…"></textarea>
+      <div class="destination">
+        <label>发送到已配对设备<select id="local-target" aria-label="目标设备"><option value="">正在读取设备…</option></select></label>
+        <button class="primary" id="send-local-target" disabled><span class="button-icon" aria-hidden="true">→</span>发送给设备</button>
+      </div>
       <div class="actions">
         <button class="secondary" id="refresh-local"><span class="button-icon" aria-hidden="true">↻</span>重新读取</button>
         <button class="primary" id="save-local"><span class="button-icon" aria-hidden="true">✓</span>保存到剪贴板</button>
@@ -283,11 +295,18 @@ function renderRemotePanel(deviceName, clientDevice) {
         <button class="tab" id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel" data-tab="history">历史</button>
       </div>
       <section id="send-panel" role="tabpanel" aria-labelledby="send-tab">
-        <div class="section-heading"><div class="eyebrow">此设备 → 电脑</div><h2>发送到电脑</h2><p class="helper">粘贴或输入内容，它会进入 Windows 剪贴板。</p></div>
+        <div class="section-heading"><div class="eyebrow">选择明确的目标</div><h2>发送到另一台设备</h2><p class="helper">发给 Windows 会立即写入剪贴板；其他设备会在自己的收件箱中收到。</p></div>
+        <label>目标设备<select id="send-target" aria-label="发送目标"><option value="windows-host">${deviceName}</option></select></label>
         <textarea id="send-text" aria-label="要发送到电脑的内容" placeholder="在这里粘贴或输入…"></textarea>
-        <div class="actions"><button class="primary" id="send-to-computer"><span class="button-icon" aria-hidden="true">↑</span>发送到电脑</button></div>
+        <div class="actions"><button class="primary" id="send-to-computer"><span class="button-icon" aria-hidden="true">↑</span>发送</button></div>
       </section>
       <section id="receive-panel" role="tabpanel" aria-labelledby="receive-tab" hidden>
+        <div class="row-heading inbox-heading">
+          <div><div class="eyebrow">其他设备 → 此设备</div><h2>设备收件箱</h2></div>
+          <button class="quiet danger" id="clear-inbox">清空</button>
+        </div>
+        <div class="inbox-list" id="inbox-list"><div class="empty">正在检查新内容…</div></div>
+        <hr class="inbox-divider">
         <div class="section-heading"><div class="eyebrow">电脑 → 此设备</div><h2>从电脑接收</h2><p class="helper">获取电脑的最新剪贴板内容，再复制到当前设备。</p></div>
         <textarea id="received-text" aria-label="从电脑接收的内容" placeholder="点击“获取最新内容”后显示在这里" readonly></textarea>
         <div class="actions">
@@ -313,6 +332,8 @@ function localModeScript() {
   return `const localField = document.querySelector('#local-clip');
     const refreshButton = document.querySelector('#refresh-local');
     const saveButton = document.querySelector('#save-local');
+    const localTarget = document.querySelector('#local-target');
+    const sendLocalTarget = document.querySelector('#send-local-target');
     const pairButton = document.querySelector('#new-pairing');
     const pairBox = document.querySelector('#pair-box');
     const pairCode = document.querySelector('#pair-code');
@@ -350,12 +371,28 @@ function localModeScript() {
           const revoke = document.createElement('button'); revoke.className = 'quiet danger'; revoke.textContent = '撤销';
           revoke.addEventListener('click', async () => {
             if (!confirm('撤销“' + device.name + '”的访问权限？')) return;
-            try { await apiJson('/api/v1/devices/' + encodeURIComponent(device.id), { method: 'DELETE' }); await refreshDevices(); }
+            try { await apiJson('/api/v1/devices/' + encodeURIComponent(device.id), { method: 'DELETE' }); await Promise.all([refreshDevices(), refreshPeers()]); }
             catch (error) { show(error.message, true); }
           });
           copy.append(name, meta); item.append(badge, copy, revoke); deviceList.append(item);
         }
       } catch (error) { deviceList.textContent = error.message; }
+    }
+
+    async function refreshPeers() {
+      try {
+        const data = await apiJson('/api/v1/peers');
+        const selected = localTarget.value;
+        localTarget.replaceChildren();
+        for (const target of data.targets) {
+          const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; localTarget.append(option);
+        }
+        if (data.targets.some((target) => target.id === selected)) localTarget.value = selected;
+        if (!data.targets.length) {
+          const option = document.createElement('option'); option.value = ''; option.textContent = '还没有其他已配对设备'; localTarget.append(option);
+        }
+        sendLocalTarget.disabled = !data.targets.length;
+      } catch (error) { sendLocalTarget.disabled = true; historyShow(error.message, true); }
     }
 
     async function refreshHistory() {
@@ -393,6 +430,15 @@ function localModeScript() {
       try { const data = await apiJson('/api/v1/history', { method: 'DELETE' }); historyShow('已清空 ' + data.removed + ' 条记录'); await refreshHistory(); }
       catch (error) { historyShow(error.message, true); }
     });
+    sendLocalTarget.addEventListener('click', async () => {
+      if (!localTarget.value) return;
+      sendLocalTarget.disabled = true;
+      try {
+        const data = await apiJson('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: localField.value, targetId: localTarget.value }) });
+        historyShow('已放入 ' + data.transfer.target.name + ' 的收件箱'); await refreshHistory();
+      } catch (error) { historyShow(error.message, true); }
+      finally { sendLocalTarget.disabled = !localTarget.value; }
+    });
     pairButton.addEventListener('click', async () => {
       pairButton.disabled = true;
       try {
@@ -412,7 +458,7 @@ function localModeScript() {
         pairUrlSelect.onchange = () => selectPairUrl(Number(pairUrlSelect.value));
         selectPairUrl(0);
         const expires = new Date(data.expiresAt); pairExpiry.textContent = '有效至 ' + expires.toLocaleTimeString() + '，使用一次后立即作废。';
-        clearInterval(pairingPoll); pairingPoll = setInterval(refreshDevices, 3000);
+        clearInterval(pairingPoll); pairingPoll = setInterval(() => { refreshDevices(); refreshPeers(); }, 3000);
       } catch (error) { show(error.message, true); }
       finally { pairButton.disabled = false; }
     });
@@ -420,7 +466,7 @@ function localModeScript() {
       if (!currentPairUrl) return;
       show(await copyText(currentPairUrl) ? '配对链接已复制' : '请手动复制配对链接', false);
     });
-    refreshLocalClipboard(); refreshHistory(); refreshDevices();`;
+    refreshLocalClipboard(); refreshHistory(); refreshDevices(); refreshPeers();`;
 }
 
 function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }) {
@@ -434,7 +480,12 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     const pairForm = document.querySelector('#pair-form');
     const remoteMessage = document.querySelector('#remote-message');
     const historyList = document.querySelector('#history-list');
+    const sendTarget = document.querySelector('#send-target');
+    const inboxList = document.querySelector('#inbox-list');
+    const receiveTab = document.querySelector('#receive-tab');
     let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
+    let currentSession = null;
+    let inboxPoll = null;
 
     if (initialLegacyToken) {
       deviceToken = initialLegacyToken; localStorage.setItem(TOKEN_KEY, deviceToken);
@@ -451,17 +502,71 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     }
 
     function showPairing() {
+      clearInterval(inboxPoll); currentSession = null;
       pairPanel.hidden = false; remotePanel.hidden = true; document.querySelector('#connection-status').textContent = '等待配对';
     }
 
     function showConnected(session) {
+      currentSession = session;
       pairPanel.hidden = true; remotePanel.hidden = false;
       document.querySelector('#connection-status').textContent = session.legacy ? '旧版连接' : '已安全配对';
       document.querySelector('#client-device-name').textContent = session.device.name;
       document.querySelector('#client-device-icon').textContent = deviceIcon(session.device.type);
       document.querySelector('#computer-name').textContent = session.computer.name;
       document.querySelector('#legacy-notice').hidden = !session.legacy;
-      refreshHistory();
+      document.querySelector('#clear-inbox').disabled = session.legacy;
+      refreshHistory(); loadPeers(); refreshInbox();
+      clearInterval(inboxPoll);
+      if (!session.legacy) inboxPoll = setInterval(refreshInbox, 5000);
+    }
+
+    async function loadPeers() {
+      const windowsOption = document.createElement('option'); windowsOption.value = 'windows-host'; windowsOption.textContent = computerDisplayName;
+      sendTarget.replaceChildren(windowsOption);
+      if (currentSession?.legacy) return;
+      try {
+        const data = await authenticated('/api/v1/peers');
+        sendTarget.replaceChildren();
+        for (const target of data.targets) {
+          const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; sendTarget.append(option);
+        }
+      } catch (error) { remoteShow(error.message, true); }
+    }
+
+    async function refreshInbox() {
+      if (!deviceToken || currentSession?.legacy) {
+        receiveTab.textContent = '接收'; inboxList.replaceChildren();
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '安全配对后可使用设备收件箱'; inboxList.append(empty); return;
+      }
+      try {
+        const data = await authenticated('/api/v1/inbox');
+        receiveTab.textContent = data.transfers.length ? '接收 · ' + data.transfers.length : '接收';
+        inboxList.replaceChildren();
+        if (!data.transfers.length) {
+          const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '暂时没有其他设备发来的内容'; inboxList.append(empty); return;
+        }
+        for (const transfer of data.transfers) {
+          const item = document.createElement('article'); item.className = 'history-item';
+          const top = document.createElement('div'); top.className = 'history-top';
+          const route = document.createElement('div'); route.className = 'history-route'; route.textContent = transfer.source.name + ' → 此设备';
+          const meta = document.createElement('time'); meta.className = 'history-meta'; meta.textContent = new Date(transfer.createdAt).toLocaleString();
+          const content = document.createElement('p'); content.className = 'history-text'; content.textContent = transfer.text || '（空文本）';
+          const actions = document.createElement('div'); actions.className = 'history-actions';
+          const accept = document.createElement('button'); accept.className = 'quiet'; accept.textContent = '复制并收下';
+          const dismiss = document.createElement('button'); dismiss.className = 'quiet danger'; dismiss.textContent = '忽略';
+          accept.addEventListener('click', async () => {
+            try {
+              if (!await copyText(transfer.text)) { remoteShow('请长按文字并选择“复制”'); return; }
+              await authenticated('/api/v1/inbox/' + encodeURIComponent(transfer.id), { method: 'DELETE' }); remoteShow('已复制并移出收件箱'); await refreshInbox();
+            } catch (error) { remoteShow(error.message, true); }
+          });
+          dismiss.addEventListener('click', async () => {
+            try { await authenticated('/api/v1/inbox/' + encodeURIComponent(transfer.id), { method: 'DELETE' }); await refreshInbox(); }
+            catch (error) { remoteShow(error.message, true); }
+          });
+          top.append(route, meta); actions.append(accept, dismiss); item.append(top, content, actions); inboxList.append(item);
+        }
+      } catch (error) { inboxList.textContent = error.message; }
     }
 
     async function refreshHistory() {
@@ -505,12 +610,21 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
       for (const tab of tabs) { const active = tab.dataset.tab === name; tab.setAttribute('aria-selected', String(active)); document.querySelector('#' + tab.getAttribute('aria-controls')).hidden = !active; }
       remoteShow('');
       if (name === 'history') refreshHistory();
+      if (name === 'receive') refreshInbox();
     }
     for (const tab of tabs) tab.addEventListener('click', () => activateTab(tab.dataset.tab));
 
     document.querySelector('#send-to-computer').addEventListener('click', async () => {
-      const button = document.querySelector('#send-to-computer'); button.disabled = true; remoteShow('正在发送到电脑…');
-      try { await authenticated('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value }) }); remoteShow('已发送到电脑剪贴板'); await refreshHistory(); }
+      const button = document.querySelector('#send-to-computer'); button.disabled = true; remoteShow('正在发送…');
+      try {
+        if (currentSession?.legacy) {
+          await authenticated('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value }) }); remoteShow('已发送到电脑剪贴板');
+        } else {
+          const data = await authenticated('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value, targetId: sendTarget.value }) });
+          remoteShow(data.delivery === 'clipboard' ? '已发送到 Windows 剪贴板' : '已放入 ' + data.transfer.target.name + ' 的收件箱');
+        }
+        await refreshHistory();
+      }
       catch (error) { remoteShow(error.message, true); }
       finally { button.disabled = false; }
     });
@@ -528,10 +642,15 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
       try { const data = await authenticated('/api/v1/history', { method: 'DELETE' }); remoteShow('已清空 ' + data.removed + ' 条记录'); await refreshHistory(); }
       catch (error) { remoteShow(error.message, true); }
     });
+    document.querySelector('#clear-inbox').addEventListener('click', async () => {
+      if (currentSession?.legacy || !confirm('清空这台设备尚未收下的全部内容？')) return;
+      try { const data = await authenticated('/api/v1/inbox', { method: 'DELETE' }); remoteShow('已清空 ' + data.removed + ' 条待接收内容'); await refreshInbox(); }
+      catch (error) { remoteShow(error.message, true); }
+    });
     document.querySelector('#forget-device').addEventListener('click', async () => {
       if (!confirm('取消这台设备与 ' + computerDisplayName + ' 的配对？')) return;
       try { await authenticated('/api/v1/session', { method: 'DELETE' }); } catch {}
-      localStorage.removeItem(TOKEN_KEY); deviceToken = ''; showPairing();
+      clearInterval(inboxPoll); localStorage.removeItem(TOKEN_KEY); deviceToken = ''; showPairing();
     });
     bootstrap();`;
 }

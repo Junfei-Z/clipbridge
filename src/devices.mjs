@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const STORE_VERSION = 1;
+const LAST_SEEN_WRITE_INTERVAL_MS = 30_000;
 
 function tokenHash(token) {
   return createHash("sha256").update(token, "utf8").digest("hex");
@@ -52,13 +53,21 @@ export class DeviceRegistry {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 
+  get(deviceId) {
+    const device = this.#devices.find((candidate) => candidate.id === deviceId);
+    return device ? publicDevice(device) : null;
+  }
+
   async authenticate(token) {
     if (typeof token !== "string" || token.length < 32) return null;
     const hash = tokenHash(token);
     const device = this.#devices.find((candidate) => safeHashEqual(candidate.tokenHash, hash));
     if (!device) return null;
-    device.lastSeenAt = new Date(this.#now()).toISOString();
-    await this.#save();
+    const timestamp = this.#now();
+    if (timestamp - Date.parse(device.lastSeenAt) >= LAST_SEEN_WRITE_INTERVAL_MS) {
+      device.lastSeenAt = new Date(timestamp).toISOString();
+      await this.#save();
+    }
     return publicDevice(device);
   }
 

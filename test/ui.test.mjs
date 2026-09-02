@@ -29,6 +29,8 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /本机剪贴板/);
   assert.match(html, /重新读取/);
   assert.match(html, /保存到剪贴板/);
+  assert.match(html, /id="local-target"/);
+  assert.match(html, /发送给设备/);
   assert.match(html, /剪贴板历史/);
   assert.match(html, /id="history-list"/);
   assert.match(html, /放回剪贴板/);
@@ -50,8 +52,11 @@ test("renders a real pairing flow plus send and receive modes remotely", () => {
   assert.match(html, /安全配对/);
   assert.match(html, /一次性配对码/);
   assert.match(html, /role="tablist"/);
-  assert.match(html, /此设备 → 电脑/);
+  assert.match(html, /选择明确的目标/);
+  assert.match(html, /id="send-target"/);
   assert.match(html, /电脑 → 此设备/);
+  assert.match(html, /设备收件箱/);
+  assert.match(html, /id="inbox-list"/);
   assert.match(html, /id="history-tab"/);
   assert.match(html, /这台设备的最近传输/);
   assert.match(html, /复制文字/);

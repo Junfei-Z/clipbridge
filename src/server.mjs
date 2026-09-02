@@ -4,6 +4,7 @@ import { createClipBridgeServer } from "./http.mjs";
 import { localIPv4Addresses } from "./network.mjs";
 import { loadDeviceRegistry } from "./devices.mjs";
 import { loadHistoryStore } from "./history.mjs";
+import { loadInboxStore } from "./inbox.mjs";
 
 if (process.platform !== "win32") {
   console.error("ClipBridge 0.2 currently runs on Windows only.");
@@ -14,11 +15,13 @@ const config = await loadConfig();
 const addresses = localIPv4Addresses();
 const devices = await loadDeviceRegistry(config.stateDir);
 const history = await loadHistoryStore(config.stateDir);
+const inbox = await loadInboxStore(config.stateDir);
 const server = createClipBridgeServer({
   config,
   instanceId: process.env.CLIPBRIDGE_INSTANCE_ID || null,
   devices,
   history,
+  inbox,
   pairingAddresses: addresses,
   clipboard: {
     readText: readClipboardText,

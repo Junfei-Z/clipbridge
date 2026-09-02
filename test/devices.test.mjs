@@ -11,6 +11,8 @@ test("paired device tokens are persisted only as hashes and can be revoked", asy
     const registry = await loadDeviceRegistry(directory, { now: () => Date.parse("2026-09-01T12:00:00Z") });
     const registered = await registry.register({ name: "  Junfei   iPhone  ", type: "iphone" });
     assert.equal(registered.device.name, "Junfei iPhone");
+    assert.equal(registry.get(registered.device.id).type, "iphone");
+    assert.equal(registry.get("missing-device"), null);
     assert.equal((await registry.authenticate(registered.token)).id, registered.device.id);
     assert.equal(await registry.authenticate("wrong-token"), null);
 
