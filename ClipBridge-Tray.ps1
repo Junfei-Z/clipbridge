@@ -20,6 +20,84 @@ function Show-ClipBridgeError {
     ) | Out-Null
 }
 
+function Get-ClipBridgeMutexName {
+    param([string]$InstallPath)
+
+    $normalizedPath = [System.IO.Path]::GetFullPath($InstallPath).TrimEnd('\').ToUpperInvariant()
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $pathBytes = [System.Text.Encoding]::UTF8.GetBytes($normalizedPath)
+        $pathHash = [System.BitConverter]::ToString($sha256.ComputeHash($pathBytes)).Replace("-", "").Substring(0, 16)
+        return "Local\ClipBridge.Tray.$pathHash"
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function Stop-StaleClipBridgeServer {
+    param(
+        [string]$RecordPath,
+        [string]$ExpectedServerPath,
+        [string]$ExpectedNodePath
+    )
+
+    if (-not (Test-Path -LiteralPath $RecordPath)) {
+        return $false
+    }
+
+    try {
+        $record = Get-Content -LiteralPath $RecordPath -Raw | ConvertFrom-Json
+        $recordPid = 0
+        if (-not [int]::TryParse([string]$record.pid, [ref]$recordPid) -or $recordPid -le 0) {
+            throw "Invalid process ID."
+        }
+
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$recordPid" -ErrorAction SilentlyContinue
+        if (-not $process) {
+            Remove-Item -LiteralPath $RecordPath -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+
+        $expectedExecutable = [System.IO.Path]::GetFullPath($ExpectedNodePath)
+        $expectedScript = [System.IO.Path]::GetFullPath($ExpectedServerPath)
+        $recordedExecutable = [System.IO.Path]::GetFullPath([string]$record.executablePath)
+        $recordedScript = [System.IO.Path]::GetFullPath([string]$record.serverPath)
+        $recordedStart = [DateTimeOffset]::Parse([string]$record.startTimeUtc)
+        $actualStart = [DateTimeOffset]$process.CreationDate
+
+        $executableMatches =
+            $recordedExecutable.Equals($expectedExecutable, [System.StringComparison]::OrdinalIgnoreCase) -and
+            ([string]$process.ExecutablePath).Equals($expectedExecutable, [System.StringComparison]::OrdinalIgnoreCase)
+        $scriptMatches =
+            $recordedScript.Equals($expectedScript, [System.StringComparison]::OrdinalIgnoreCase) -and
+            ([string]$process.CommandLine).IndexOf($expectedScript, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+        $startMatches = [Math]::Abs(($actualStart - $recordedStart).TotalSeconds) -le 2
+        $instanceMatches = ([string]$record.instanceId) -match '^[a-f0-9]{32}$'
+
+        if (-not ($executableMatches -and $scriptMatches -and $startMatches -and $instanceMatches)) {
+            Remove-Item -LiteralPath $RecordPath -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+
+        Stop-Process -Id $recordPid -Force -ErrorAction Stop
+        $stopDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while (Get-Process -Id $recordPid -ErrorAction SilentlyContinue) {
+            if ([DateTime]::UtcNow -gt $stopDeadline) {
+                throw "The previous ClipBridge service did not stop."
+            }
+            Start-Sleep -Milliseconds 100
+        }
+        Remove-Item -LiteralPath $RecordPath -Force -ErrorAction SilentlyContinue
+        return $true
+    }
+    catch {
+        # A malformed or unverifiable record is never permission to stop a process.
+        Remove-Item -LiteralPath $RecordPath -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
 Set-Location -LiteralPath $PSScriptRoot
 
 $stateDirectory = Join-Path $PSScriptRoot ".clipbridge"
@@ -27,6 +105,7 @@ $configPath = Join-Path $stateDirectory "config.json"
 $serverPath = Join-Path $PSScriptRoot "src\server.mjs"
 $stdoutLogPath = Join-Path $stateDirectory "server.log"
 $stderrLogPath = Join-Path $stateDirectory "server-error.log"
+$serverRecordPath = Join-Path $stateDirectory "server-process.json"
 $serverProcess = $null
 $notifyIcon = $null
 $exitTimer = $null
@@ -48,7 +127,8 @@ try {
     }
 
     $createdNew = $false
-    $mutex = New-Object System.Threading.Mutex($true, "Local\ClipBridge.Tray", [ref]$createdNew)
+    $mutexName = Get-ClipBridgeMutexName $PSScriptRoot
+    $mutex = New-Object System.Threading.Mutex($true, $mutexName, [ref]$createdNew)
     $ownsMutex = $createdNew
 
     if (-not $createdNew) {
@@ -68,6 +148,11 @@ try {
     }
 
     New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
+    $staleServerStopped = Stop-StaleClipBridgeServer `
+        -RecordPath $serverRecordPath `
+        -ExpectedServerPath $serverPath `
+        -ExpectedNodePath $nodeCommand.Source
+
     $quotedServerPath = '"' + $serverPath.Replace('"', '\"') + '"'
     $launchInstanceId = [System.Guid]::NewGuid().ToString("N")
     $env:CLIPBRIDGE_LAUNCH_MODE = "tray"
@@ -81,6 +166,15 @@ try {
             -RedirectStandardOutput $stdoutLogPath `
             -RedirectStandardError $stderrLogPath `
             -PassThru
+
+        [ordered]@{
+            schemaVersion = 1
+            pid = $serverProcess.Id
+            startTimeUtc = $serverProcess.StartTime.ToUniversalTime().ToString("o")
+            executablePath = [System.IO.Path]::GetFullPath($nodeCommand.Source)
+            serverPath = [System.IO.Path]::GetFullPath($serverPath)
+            instanceId = $launchInstanceId
+        } | ConvertTo-Json | Set-Content -LiteralPath $serverRecordPath -Encoding UTF8
     }
     finally {
         $env:CLIPBRIDGE_LAUNCH_MODE = $previousLaunchMode
@@ -124,6 +218,9 @@ try {
             $detail = (Get-Content -LiteralPath $stderrLogPath -Tail 8 -ErrorAction SilentlyContinue) -join [Environment]::NewLine
         }
         if ($detail) {
+            if ($detail -match "EADDRINUSE") {
+                throw "Port $($config.port) is already in use. ClipBridge only stops a previous service when its ownership record matches this installation. Close any manually started ClipBridge console and try again.`n`nLog: $stderrLogPath"
+            }
             throw "The local service did not become ready.`n`n$detail`n`nLog: $stderrLogPath"
         }
         throw "The local service did not become ready. See $stderrLogPath for details."
@@ -193,7 +290,13 @@ try {
         [System.Windows.Forms.Application]::Exit()
     })
 
-    $notifyIcon.ShowBalloonTip(2200, "ClipBridge is ready", "Double-click the tray icon to open the quick panel.", [System.Windows.Forms.ToolTipIcon]::Info)
+    $readyMessage = if ($staleServerStopped) {
+        "A previous ClipBridge service was cleaned up. Double-click the tray icon to open the quick panel."
+    }
+    else {
+        "Double-click the tray icon to open the quick panel."
+    }
+    $notifyIcon.ShowBalloonTip(2600, "ClipBridge is ready", $readyMessage, [System.Windows.Forms.ToolTipIcon]::Info)
     if (-not $NoAutoOpen) {
         Start-Process $localPanelUrl
     }
@@ -224,6 +327,17 @@ finally {
     }
     if ($serverProcess -and -not $serverProcess.HasExited) {
         Stop-Process -Id $serverProcess.Id
+    }
+    if ($serverProcess -and (Test-Path -LiteralPath $serverRecordPath)) {
+        try {
+            $currentRecord = Get-Content -LiteralPath $serverRecordPath -Raw | ConvertFrom-Json
+            if ([int]$currentRecord.pid -eq $serverProcess.Id) {
+                Remove-Item -LiteralPath $serverRecordPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        catch {
+            # Leave an unverifiable record for the next launch to discard safely.
+        }
     }
     if ($mutex) {
         if ($ownsMutex) {

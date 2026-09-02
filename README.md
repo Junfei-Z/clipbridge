@@ -32,6 +32,8 @@ Start-ClipBridge-Tray.cmd
 
 The temporary command window closes immediately. When the service is ready, ClipBridge opens the quick panel in your default browser and stays available from the Windows notification area. Double-clicking the launcher again opens the existing panel rather than starting a duplicate service.
 
+If Windows or the tray process closes unexpectedly, the launcher can clean up the exact ClipBridge service it previously started. It validates a private process record before stopping anything; unrelated Node.js programs and manually started development servers are left alone.
+
 The tray menu can open the quick panel, copy the private pairing URL, or stop ClipBridge. For development and diagnostics, run the service directly:
 
 ```powershell

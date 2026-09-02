@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 - 2026-09-01
+
+### Improved
+
+- The tray launcher records the exact Node process it owns.
+- Single-instance locking is scoped to the installation directory, so another ClipBridge copy or an isolated test cannot block it.
+- A later launch automatically stops a stale owned ClipBridge service after validating its PID, executable, script path, start time, and instance ID.
+- Unrelated Node processes and manually started ClipBridge development servers are never stopped automatically.
+- Port conflicts now show a short, actionable explanation instead of the raw Node.js error.
+
 ## 0.1.1 - 2026-09-01
 
 ### Improved
