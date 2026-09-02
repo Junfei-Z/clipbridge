@@ -2,12 +2,13 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
+import { HistoryStore } from "./history.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
 import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.2.1";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -75,12 +76,17 @@ function legacyIdentity(clientDevice) {
   return { id: "legacy-token", name: clientDevice.label, type: clientDevice.type, kind: "legacy" };
 }
 
+function transferEndpoint(identity) {
+  return { id: identity.id, name: identity.name, type: identity.type };
+}
+
 export function createClipBridgeServer({
   config,
   clipboard,
   now = () => Date.now(),
   instanceId = null,
   devices = new DeviceRegistry({ now }),
+  history = new HistoryStore({ now }),
   pairing = new PairingManager({ now }),
   pairingAddresses = [],
   isLocalRequest = (address) => isLoopbackAddress(address)
@@ -261,8 +267,46 @@ export function createClipBridgeServer({
         return;
       }
 
+      if (requestUrl.pathname === "/api/v1/history" && request.method === "GET") {
+        const requestedLimit = Number.parseInt(requestUrl.searchParams.get("limit") ?? "50", 10);
+        json(response, 200, {
+          entries: history.list({
+            deviceId: isLocal ? null : identity.id,
+            limit: Number.isFinite(requestedLimit) ? requestedLimit : 50
+          }),
+          scope: isLocal ? "all" : "device"
+        });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/history" && request.method === "DELETE") {
+        const removed = await history.clear({ deviceId: isLocal ? null : identity.id });
+        json(response, 200, { ok: true, removed });
+        return;
+      }
+
+      const historyRoute = requestUrl.pathname.match(/^\/api\/v1\/history\/([^/]+)$/);
+      if (historyRoute && request.method === "DELETE") {
+        const removed = await history.remove(decodeURIComponent(historyRoute[1]), {
+          deviceId: isLocal ? null : identity.id
+        });
+        if (!removed) {
+          json(response, 404, { error: "没有找到这条历史记录。" });
+          return;
+        }
+        json(response, 200, { ok: true });
+        return;
+      }
+
       if (requestUrl.pathname === "/api/v1/clip" && request.method === "GET") {
         const text = await clipboard.readText();
+        if (!isLocal) {
+          await history.add({
+            text,
+            source: transferEndpoint(localIdentity(config)),
+            target: transferEndpoint(identity)
+          });
+        }
         json(response, 200, {
           id: randomUUID(),
           kind: "text",
@@ -284,6 +328,13 @@ export function createClipBridgeServer({
           return;
         }
         await clipboard.writeText(body.text);
+        if (!isLocal) {
+          await history.add({
+            text: body.text,
+            source: transferEndpoint(identity),
+            target: transferEndpoint(localIdentity(config))
+          });
+        }
         json(response, 200, {
           ok: true,
           source: { id: identity.id, name: identity.name, type: identity.type },

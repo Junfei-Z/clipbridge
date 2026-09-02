@@ -77,7 +77,7 @@ export function renderDashboard({
     .device-copy strong { display: block; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
     .pair-route { display: flex; align-items: center; gap: 5px; color: #20a767; font-size: 11px; white-space: nowrap; }
     .pair-route::before, .pair-route::after { content: ""; width: 12px; height: 1px; background: #8bd5af; }
-    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 22px; padding: 4px; border-radius: 15px; background: #eef0f5; }
+    .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 22px; padding: 4px; border-radius: 15px; background: #eef0f5; }
     .tab { padding: 10px 14px; color: #657086; background: transparent; box-shadow: none; }
     .tab[aria-selected="true"] { color: #4224b8; background: #fff; box-shadow: 0 3px 10px #26334d14; }
     .message { min-height: 22px; margin: 13px 2px 0; color: #657086; font-size: 13px; }
@@ -91,6 +91,13 @@ export function renderDashboard({
     .device-item .copy { flex: 1; min-width: 0; }
     .device-item strong, .device-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .device-item small { margin-top: 2px; color: #8a93a6; }
+    .history-list { display: grid; gap: 9px; }
+    .history-item { padding: 13px; border: 1px solid #eceef3; border-radius: 15px; background: #fafbfc; }
+    .history-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .history-route { overflow: hidden; color: #5e687d; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .history-meta { flex: 0 0 auto; color: #929aac; font-size: 11px; }
+    .history-text { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: #273147; font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+    .history-actions { display: flex; justify-content: flex-end; gap: 5px; margin-top: 8px; }
     .empty { padding: 18px 8px; color: #8a93a6; text-align: center; font-size: 13px; }
     .notice { margin-bottom: 16px; padding: 11px 13px; color: #664f18; background: #fff7d8; border: 1px solid #f0df9c; border-radius: 13px; font-size: 12px; line-height: 1.5; }
     .warning { margin-top: 16px; color: #7a6840; background: #fff8df; border: 1px solid #f1df9e; border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; }
@@ -109,6 +116,8 @@ export function renderDashboard({
       .form-grid .full { grid-column: auto; }
       .pair-box { grid-template-columns: 1fr; text-align: center; }
       .qr { margin: auto; }
+      .history-top { align-items: flex-start; flex-direction: column; gap: 3px; }
+      .history-actions button { flex: 0 1 auto; }
     }
     @media (prefers-color-scheme: dark) {
       :root { color: #eef1f7; background: #11141a; }
@@ -120,6 +129,8 @@ export function renderDashboard({
       .tab[aria-selected="true"] { color: #fff; background: #5f35f2; box-shadow: none; }
       .pairing, .pair-box { border-color: #3b4050; background: linear-gradient(135deg, #23202f, #1d2731); }
       .device-item { border-color: #303744; }
+      .history-item { border-color: #303744; background: #151920; }
+      .history-text { color: #e6eaf2; }
       .danger { color: #ffb2b2; background: #442626; }
       .notice, .warning { color: #e7d99f; background: #302a18; border-color: #554a27; }
     }
@@ -165,6 +176,26 @@ export function renderDashboard({
       finally { if (field && !field.id) field.remove(); }
     }
 
+    function renderHistoryList(container, entries, { actionLabel, onUse, onDelete }) {
+      container.replaceChildren();
+      if (!entries.length) {
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '还没有传输记录'; container.append(empty); return;
+      }
+      for (const entry of entries) {
+        const item = document.createElement('article'); item.className = 'history-item';
+        const top = document.createElement('div'); top.className = 'history-top';
+        const route = document.createElement('div'); route.className = 'history-route'; route.textContent = entry.source.name + ' → ' + entry.target.name;
+        const meta = document.createElement('time'); meta.className = 'history-meta'; meta.dateTime = entry.createdAt; meta.textContent = new Date(entry.createdAt).toLocaleString();
+        const content = document.createElement('p'); content.className = 'history-text'; content.textContent = entry.text || '（空文本）';
+        const actions = document.createElement('div'); actions.className = 'history-actions';
+        const use = document.createElement('button'); use.className = 'quiet'; use.textContent = actionLabel;
+        const remove = document.createElement('button'); remove.className = 'quiet danger'; remove.textContent = '删除';
+        use.addEventListener('click', () => onUse(entry));
+        remove.addEventListener('click', () => onDelete(entry));
+        top.append(route, meta); actions.append(use, remove); item.append(top, content, actions); container.append(item);
+      }
+    }
+
     ${modeScript}
   </script>
 </body>
@@ -185,6 +216,15 @@ function renderLocalPanel() {
         <button class="primary" id="save-local"><span class="button-icon" aria-hidden="true">✓</span>保存到剪贴板</button>
       </div>
       <div class="message" id="message" role="status" aria-live="polite"></div>
+    </section>
+    <section class="card" aria-labelledby="history-title">
+      <div class="row-heading">
+        <div><div class="eyebrow">最近传输</div><h2 id="history-title">剪贴板历史</h2></div>
+        <button class="quiet danger" id="clear-history">清空</button>
+      </div>
+      <p class="helper">仅记录通过 ClipBridge 主动传输的文本，最多保留 50 条，并且只保存在这台 Windows 电脑上。</p>
+      <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
+      <div class="message" id="history-message" role="status" aria-live="polite"></div>
     </section>
     <section class="card" aria-labelledby="devices-title">
       <div class="row-heading">
@@ -240,6 +280,7 @@ function renderRemotePanel(deviceName, clientDevice) {
       <div class="tabs" role="tablist" aria-label="传输方向">
         <button class="tab" id="send-tab" role="tab" aria-selected="true" aria-controls="send-panel" data-tab="send">发送</button>
         <button class="tab" id="receive-tab" role="tab" aria-selected="false" aria-controls="receive-panel" data-tab="receive">接收</button>
+        <button class="tab" id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel" data-tab="history">历史</button>
       </div>
       <section id="send-panel" role="tabpanel" aria-labelledby="send-tab">
         <div class="section-heading"><div class="eyebrow">此设备 → 电脑</div><h2>发送到电脑</h2><p class="helper">粘贴或输入内容，它会进入 Windows 剪贴板。</p></div>
@@ -253,6 +294,14 @@ function renderRemotePanel(deviceName, clientDevice) {
           <button class="secondary" id="receive-from-computer"><span class="button-icon" aria-hidden="true">↓</span>获取最新内容</button>
           <button class="primary" id="copy-to-device" disabled><span class="button-icon" aria-hidden="true">⧉</span>复制到此设备</button>
         </div>
+      </section>
+      <section id="history-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
+        <div class="row-heading">
+          <div><div class="eyebrow">这台设备的最近传输</div><h2>剪贴板历史</h2></div>
+          <button class="quiet danger" id="clear-history">清空</button>
+        </div>
+        <p class="helper">最多保留 50 条，仅显示与当前设备有关的记录；内容保存在 Windows 电脑上。</p>
+        <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
       </section>
       <div class="message" id="remote-message" role="status" aria-live="polite"></div>
       <div class="actions"><button class="quiet danger" id="forget-device">取消此设备的配对</button></div>
@@ -272,6 +321,9 @@ function localModeScript() {
     const pairUrlSelect = document.querySelector('#pair-url-select');
     const pairExpiry = document.querySelector('#pair-expiry');
     const deviceList = document.querySelector('#device-list');
+    const historyList = document.querySelector('#history-list');
+    const historyMessage = document.querySelector('#history-message');
+    const historyShow = (text, error = false) => { historyMessage.textContent = text; historyMessage.style.color = error ? '#d14343' : ''; };
     let currentPairUrl = '';
     let pairingPoll = null;
 
@@ -306,6 +358,25 @@ function localModeScript() {
       } catch (error) { deviceList.textContent = error.message; }
     }
 
+    async function refreshHistory() {
+      try {
+        const data = await apiJson('/api/v1/history');
+        renderHistoryList(historyList, data.entries, {
+          actionLabel: '放回剪贴板',
+          onUse: async (entry) => {
+            try {
+              await apiJson('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: entry.text }) });
+              localField.value = entry.text; historyShow('已放回 Windows 剪贴板');
+            } catch (error) { historyShow(error.message, true); }
+          },
+          onDelete: async (entry) => {
+            try { await apiJson('/api/v1/history/' + encodeURIComponent(entry.id), { method: 'DELETE' }); historyShow('已删除这条记录'); await refreshHistory(); }
+            catch (error) { historyShow(error.message, true); }
+          }
+        });
+      } catch (error) { historyList.textContent = error.message; }
+    }
+
     function deviceIcon(type) {
       return ({ iphone: '📱', ipad: '▣', android: '🤖', mac: '⌘', windows: '💻' })[type] || '◆';
     }
@@ -317,6 +388,11 @@ function localModeScript() {
       finally { saveButton.disabled = false; }
     });
     refreshButton.addEventListener('click', refreshLocalClipboard);
+    document.querySelector('#clear-history').addEventListener('click', async () => {
+      if (!confirm('清空这台 Windows 电脑上的全部剪贴板历史？')) return;
+      try { const data = await apiJson('/api/v1/history', { method: 'DELETE' }); historyShow('已清空 ' + data.removed + ' 条记录'); await refreshHistory(); }
+      catch (error) { historyShow(error.message, true); }
+    });
     pairButton.addEventListener('click', async () => {
       pairButton.disabled = true;
       try {
@@ -344,7 +420,7 @@ function localModeScript() {
       if (!currentPairUrl) return;
       show(await copyText(currentPairUrl) ? '配对链接已复制' : '请手动复制配对链接', false);
     });
-    refreshLocalClipboard(); refreshDevices();`;
+    refreshLocalClipboard(); refreshHistory(); refreshDevices();`;
 }
 
 function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }) {
@@ -357,6 +433,7 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     const remotePanel = document.querySelector('#remote-panel');
     const pairForm = document.querySelector('#pair-form');
     const remoteMessage = document.querySelector('#remote-message');
+    const historyList = document.querySelector('#history-list');
     let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
 
     if (initialLegacyToken) {
@@ -384,6 +461,24 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
       document.querySelector('#client-device-icon').textContent = deviceIcon(session.device.type);
       document.querySelector('#computer-name').textContent = session.computer.name;
       document.querySelector('#legacy-notice').hidden = !session.legacy;
+      refreshHistory();
+    }
+
+    async function refreshHistory() {
+      if (!deviceToken) return;
+      try {
+        const data = await authenticated('/api/v1/history');
+        renderHistoryList(historyList, data.entries, {
+          actionLabel: '复制文字',
+          onUse: async (entry) => {
+            remoteShow(await copyText(entry.text) ? '已复制到此设备的剪贴板' : '请长按文字并选择“复制”');
+          },
+          onDelete: async (entry) => {
+            try { await authenticated('/api/v1/history/' + encodeURIComponent(entry.id), { method: 'DELETE' }); remoteShow('已删除这条记录'); await refreshHistory(); }
+            catch (error) { remoteShow(error.message, true); }
+          }
+        });
+      } catch (error) { historyList.textContent = error.message; }
     }
 
     async function bootstrap() {
@@ -409,23 +504,29 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     function activateTab(name) {
       for (const tab of tabs) { const active = tab.dataset.tab === name; tab.setAttribute('aria-selected', String(active)); document.querySelector('#' + tab.getAttribute('aria-controls')).hidden = !active; }
       remoteShow('');
+      if (name === 'history') refreshHistory();
     }
     for (const tab of tabs) tab.addEventListener('click', () => activateTab(tab.dataset.tab));
 
     document.querySelector('#send-to-computer').addEventListener('click', async () => {
       const button = document.querySelector('#send-to-computer'); button.disabled = true; remoteShow('正在发送到电脑…');
-      try { await authenticated('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value }) }); remoteShow('已发送到电脑剪贴板'); }
+      try { await authenticated('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value }) }); remoteShow('已发送到电脑剪贴板'); await refreshHistory(); }
       catch (error) { remoteShow(error.message, true); }
       finally { button.disabled = false; }
     });
     document.querySelector('#receive-from-computer').addEventListener('click', async () => {
       const button = document.querySelector('#receive-from-computer'); const copy = document.querySelector('#copy-to-device'); button.disabled = true; copy.disabled = true; remoteShow('正在获取电脑剪贴板…');
-      try { document.querySelector('#received-text').value = (await authenticated('/api/v1/clip')).text; copy.disabled = false; remoteShow('已获取电脑的最新内容'); }
+      try { document.querySelector('#received-text').value = (await authenticated('/api/v1/clip')).text; copy.disabled = false; remoteShow('已获取电脑的最新内容'); await refreshHistory(); }
       catch (error) { remoteShow(error.message, true); }
       finally { button.disabled = false; }
     });
     document.querySelector('#copy-to-device').addEventListener('click', async () => {
       const field = document.querySelector('#received-text'); remoteShow(await copyText(field.value, field) ? '已复制到此设备的剪贴板' : '已选中文字，请长按并选择“复制”', false);
+    });
+    document.querySelector('#clear-history').addEventListener('click', async () => {
+      if (!confirm('清空与这台设备有关的剪贴板历史？')) return;
+      try { const data = await authenticated('/api/v1/history', { method: 'DELETE' }); remoteShow('已清空 ' + data.removed + ' 条记录'); await refreshHistory(); }
+      catch (error) { remoteShow(error.message, true); }
     });
     document.querySelector('#forget-device').addEventListener('click', async () => {
       if (!confirm('取消这台设备与 ' + computerDisplayName + ' 的配对？')) return;

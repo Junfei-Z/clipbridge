@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DeviceRegistry } from "../src/devices.mjs";
+import { HistoryStore } from "../src/history.mjs";
 import { createClipBridgeServer } from "../src/http.mjs";
 import { PairingManager } from "../src/pairing.mjs";
 
@@ -10,6 +11,8 @@ const LOCAL_HEADERS = { "X-ClipBridge-Test-Local": "1" };
 async function withServer(run) {
   let value = "from Windows";
   const now = () => Date.parse("2026-09-01T12:00:00Z");
+  const devices = new DeviceRegistry({ now });
+  const history = new HistoryStore({ now });
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024, port: 39393 },
     clipboard: {
@@ -17,7 +20,8 @@ async function withServer(run) {
       writeText: async (next) => { value = next; }
     },
     now,
-    devices: new DeviceRegistry({ now }),
+    devices,
+    history,
     pairing: new PairingManager({ now }),
     pairingAddresses: ["192.168.1.23"],
     isLocalRequest: (_address, request) => request.headers["x-clipbridge-test-local"] === "1"
@@ -25,7 +29,7 @@ async function withServer(run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const { port } = server.address();
-    await run(`http://127.0.0.1:${port}`, () => value);
+    await run(`http://127.0.0.1:${port}`, () => value, { devices, history });
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -96,6 +100,29 @@ test("completes one-time device pairing and supports individual revocation", asy
     assert.equal((await clipResponse.json()).source.name, "Junfei 的 iPhone");
     assert.equal(currentValue(), "你好，安全配对");
 
+    const receiveResponse = await fetch(`${baseUrl}/api/v1/clip`, { headers: auth });
+    assert.equal(receiveResponse.status, 200);
+    assert.equal((await receiveResponse.json()).text, "你好，安全配对");
+
+    const historyResponse = await fetch(`${baseUrl}/api/v1/history`, { headers: auth });
+    assert.equal(historyResponse.status, 200);
+    const history = await historyResponse.json();
+    assert.equal(history.scope, "device");
+    assert.equal(history.entries.length, 2);
+    assert.equal(history.entries[0].source.id, "windows-host");
+    assert.equal(history.entries[0].target.id, paired.device.id);
+    assert.equal(history.entries[1].source.id, paired.device.id);
+    assert.equal(history.entries[1].target.id, "windows-host");
+    assert.equal(history.entries[1].text, "你好，安全配对");
+
+    const removeHistoryResponse = await fetch(`${baseUrl}/api/v1/history/${history.entries[0].id}`, {
+      method: "DELETE",
+      headers: auth
+    });
+    assert.equal(removeHistoryResponse.status, 200);
+    const clearHistoryResponse = await fetch(`${baseUrl}/api/v1/history`, { method: "DELETE", headers: auth });
+    assert.deepEqual(await clearHistoryResponse.json(), { ok: true, removed: 1 });
+
     const devicesResponse = await fetch(`${baseUrl}/api/v1/devices`, { headers: LOCAL_HEADERS });
     assert.deepEqual((await devicesResponse.json()).devices.map(({ id }) => id), [paired.device.id]);
 
@@ -115,6 +142,30 @@ test("a pairing code can only be used once", async () => {
     const body = JSON.stringify({ code, name: "iPhone", type: "iphone" });
     assert.equal((await fetch(`${baseUrl}/api/v1/pair`, { method: "POST", headers: { "Content-Type": "application/json" }, body })).status, 201);
     assert.equal((await fetch(`${baseUrl}/api/v1/pair`, { method: "POST", headers: { "Content-Type": "application/json" }, body })).status, 401);
+  });
+});
+
+test("paired devices can only read and delete their own transfer history", async () => {
+  await withServer(async (baseUrl, _currentValue, { devices, history }) => {
+    const iphone = await devices.register({ name: "Junfei 的 iPhone", type: "iphone" });
+    const mac = await devices.register({ name: "Junfei 的 Mac", type: "mac" });
+    const windows = { id: "windows-host", name: "Test PC", type: "windows" };
+    const iphoneEntry = await history.add({ text: "phone only", source: iphone.device, target: windows });
+    const macEntry = await history.add({ text: "mac only", source: mac.device, target: windows });
+    const iphoneAuth = { Authorization: `Bearer ${iphone.token}` };
+    const macAuth = { Authorization: `Bearer ${mac.token}` };
+
+    const iphoneHistory = await (await fetch(`${baseUrl}/api/v1/history`, { headers: iphoneAuth })).json();
+    const macHistory = await (await fetch(`${baseUrl}/api/v1/history`, { headers: macAuth })).json();
+    assert.deepEqual(iphoneHistory.entries.map(({ id }) => id), [iphoneEntry.id]);
+    assert.deepEqual(macHistory.entries.map(({ id }) => id), [macEntry.id]);
+
+    assert.equal((await fetch(`${baseUrl}/api/v1/history/${macEntry.id}`, { method: "DELETE", headers: iphoneAuth })).status, 404);
+    assert.equal((await fetch(`${baseUrl}/api/v1/history/${iphoneEntry.id}`, { method: "DELETE", headers: iphoneAuth })).status, 200);
+
+    const localHistory = await (await fetch(`${baseUrl}/api/v1/history`, { headers: LOCAL_HEADERS })).json();
+    assert.deepEqual(localHistory.entries.map(({ id }) => id), [macEntry.id]);
+    assert.equal(localHistory.scope, "all");
   });
 });
 
@@ -162,7 +213,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.2.0 and the runtime instance on the health endpoint", async () => {
+test("reports v0.2.1 and the runtime instance on the health endpoint", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -175,7 +226,7 @@ test("reports v0.2.0 and the runtime instance on the health endpoint", async () 
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.2.0",
+      version: "0.2.1",
       instanceId: "tray-launch-123"
     });
   } finally {

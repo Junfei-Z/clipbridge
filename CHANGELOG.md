@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1 - 2026-09-02
+
+### Added
+
+- Local persistent history for the latest 50 text transfers explicitly made through ClipBridge.
+- Source device, target device, timestamp, copy/replay, single-delete, and clear controls.
+- A third **History** tab on paired devices and a dedicated history card on Windows.
+- Device-scoped history access so a paired device cannot read or delete another device's transfers.
+
+### Privacy
+
+- History is stored only in `.clipbridge/history.json` on the Windows computer.
+- ClipBridge does not monitor unrelated Windows clipboard changes, and clipboard text is still never written to logs.
+
 ## 0.2.0 - 2026-09-02
 
 ### Added

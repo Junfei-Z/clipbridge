@@ -17,6 +17,7 @@ ClipBridge transfers plain text between a Windows PC, iPhone, Mac, and other dev
 - Revoke one device without breaking access for the others.
 - Send Unicode plain text to Windows and retrieve the current Windows clipboard.
 - Use a focused clipboard manager on Windows and direction-aware **Send** / **Receive** modes remotely.
+- Reuse, copy, delete, or clear the latest 50 explicit ClipBridge transfers from a device-scoped history.
 - Keep the same high-resolution ClipBridge mascot in the tray, browser, and iPhone Home Screen.
 - Continue opening v0.1 shared-token links during migration.
 
@@ -82,9 +83,9 @@ ClipBridge keeps local settings in `.clipbridge/`:
 
 - `config.json` contains the port, Windows name, and the legacy v0.1 migration token.
 - `devices.json` contains device metadata and key hashes. Usable per-device keys are never written there.
-- Clipboard text is not added to logs or persistent history in 0.2.0.
+- `history.json` contains up to 50 text transfers explicitly made through ClipBridge, including source, target, and timestamp.
 
-Clipboard history is intentionally scheduled for the next 0.2.x phase so retention controls can be designed separately from pairing.
+ClipBridge does not watch or index every Windows clipboard change. History stays on the Windows computer: its local panel can see all entries, while a paired device only receives entries in which that device is the source or target. Single entries and the visible history scope can be cleared from either interface.
 
 ## Apple Shortcuts migration
 
@@ -130,6 +131,16 @@ Content-Type: application/json
 GET /api/v1/session
 ```
 
+### List or clear clipboard history
+
+```http
+GET /api/v1/history?limit=50
+DELETE /api/v1/history
+DELETE /api/v1/history/<entry-id>
+```
+
+Windows loopback requests can manage every entry. A paired device is limited to transfers involving its own device identity.
+
 ### Health check
 
 ```http
@@ -139,7 +150,7 @@ GET /health
 ## Roadmap
 
 - **0.2.0:** Device identity, one-time pairing, QR pairing, device management, and revocation.
-- **0.2.x:** Clipboard history with source device, target device, timestamps, limits, and clear controls.
+- **0.2.1:** Local clipboard history with source and target devices, timestamps, a 50-entry limit, replay/copy, and scoped clear controls.
 - **0.3.0:** Full multi-device routing, named destinations, and a native Mac companion.
 - Later: images and screenshots, iOS Share Extension / App Intents, and an end-to-end encrypted cross-network relay.
 
