@@ -1,14 +1,16 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
-import { isPrivateAddress } from "./network.mjs";
-import { renderDashboard } from "./ui.mjs";
+import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
+import { clientDeviceLabelFromUserAgent, renderDashboard } from "./ui.mjs";
 
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
   ["/favicon-16.png", { source: new URL("../assets/favicon-16.png", import.meta.url), type: "image/png" }],
   ["/favicon-32.png", { source: new URL("../assets/favicon-32.png", import.meta.url), type: "image/png" }],
+  ["/brand-icon-96.png", { source: new URL("../assets/brand-icon-96.png", import.meta.url), type: "image/png" }],
+  ["/brand-icon-192.png", { source: new URL("../assets/brand-icon-192.png", import.meta.url), type: "image/png" }],
   ["/apple-touch-icon.png", { source: new URL("../assets/apple-touch-icon.png", import.meta.url), type: "image/png" }],
   ["/icons/icon-192.png", { source: new URL("../assets/icon-192.png", import.meta.url), type: "image/png" }],
   ["/icons/icon-512.png", { source: new URL("../assets/icon-512.png", import.meta.url), type: "image/png" }]
@@ -70,7 +72,7 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
       json(response, 200, {
         ok: true,
         device: config.deviceName,
-        version: "0.1.4",
+        version: "0.1.5",
         ...(instanceId ? { instanceId } : {})
       });
       return;
@@ -132,7 +134,12 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
           "X-Content-Type-Options": "nosniff",
           "X-Frame-Options": "DENY"
         });
-        response.end(renderDashboard({ deviceName: config.deviceName, token: config.token }));
+        response.end(renderDashboard({
+          deviceName: config.deviceName,
+          token: config.token,
+          isLocal: isLoopbackAddress(remoteAddress),
+          clientDevice: clientDeviceLabelFromUserAgent(request.headers["user-agent"])
+        }));
         return;
       }
 

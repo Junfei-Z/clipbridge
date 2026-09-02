@@ -45,14 +45,17 @@ test("gets and sets text clipboard content", async () => {
   });
 });
 
-test("serves the quick panel only to a paired request", async () => {
+test("serves the local Windows panel only to a paired loopback request", async () => {
   await withServer(async (baseUrl) => {
     const denied = await fetch(`${baseUrl}/ui`);
     assert.equal(denied.status, 401);
 
     const allowed = await fetch(`${baseUrl}/ui?token=${"a".repeat(32)}`);
     assert.equal(allowed.status, 200);
-    assert.match(await allowed.text(), /发送到 Windows/);
+    const html = await allowed.text();
+    assert.match(html, /Windows 本机/);
+    assert.match(html, /保存到剪贴板/);
+    assert.doesNotMatch(html, /id="send-tab"/);
   });
 });
 
@@ -66,6 +69,11 @@ test("serves unified app icons to devices on the private network", async () => {
     const appleIcon = await fetch(`${baseUrl}/apple-touch-icon.png`);
     assert.equal(appleIcon.status, 200);
     assert.equal(appleIcon.headers.get("content-type"), "image/png");
+
+    const brandIcon = await fetch(`${baseUrl}/brand-icon-192.png`);
+    assert.equal(brandIcon.status, 200);
+    assert.equal(brandIcon.headers.get("content-type"), "image/png");
+    assert.ok((await brandIcon.arrayBuffer()).byteLength > 10000);
   });
 });
 
@@ -98,7 +106,7 @@ test("reports the runtime instance on the health endpoint", async () => {
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.1.4",
+      version: "0.1.5",
       instanceId: "tray-launch-123"
     });
   } finally {

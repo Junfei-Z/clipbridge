@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.5 - 2026-09-02
+
+### Improved
+
+- The quick panel now adapts to where it is opened instead of showing the same three actions everywhere.
+- High-density transparent brand artwork keeps the ClipBridge mascot sharp in desktop and mobile page headers.
+- Windows localhost opens a focused clipboard manager with **Reload** and **Save to clipboard** actions.
+- iPhone, MacBook, and other private-network devices use separate **Send** and **Receive** modes.
+- Remote panels show the current device family and Windows host name as a clear two-device connection.
+- Ambiguous copy language is replaced with an explicit **Copy to this device** action.
+- Remote status and transfer messages now make the source and destination clear.
+
 ## 0.1.4 - 2026-09-02
 
 ### Added

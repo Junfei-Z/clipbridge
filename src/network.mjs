@@ -11,9 +11,14 @@ export function normalizeAddress(address = "") {
   return address.startsWith("::ffff:") ? address.slice(7) : address;
 }
 
+export function isLoopbackAddress(address) {
+  const normalized = normalizeAddress(address).toLowerCase();
+  return normalized.startsWith("127.") || normalized === "::1";
+}
+
 export function isPrivateAddress(address) {
   const normalized = normalizeAddress(address).toLowerCase();
-  if (normalized === "127.0.0.1" || normalized === "::1") return true;
+  if (isLoopbackAddress(normalized)) return true;
   if (normalized.startsWith("10.") || normalized.startsWith("192.168.")) return true;
   if (normalized.startsWith("169.254.")) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(normalized)) return true;
