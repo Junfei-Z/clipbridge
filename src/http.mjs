@@ -1,9 +1,18 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { isPrivateAddress } from "./network.mjs";
 import { renderDashboard } from "./ui.mjs";
 
 const JSON_TYPE = "application/json; charset=utf-8";
+const STATIC_ASSETS = new Map([
+  ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
+  ["/favicon-16.png", { source: new URL("../assets/favicon-16.png", import.meta.url), type: "image/png" }],
+  ["/favicon-32.png", { source: new URL("../assets/favicon-32.png", import.meta.url), type: "image/png" }],
+  ["/apple-touch-icon.png", { source: new URL("../assets/apple-touch-icon.png", import.meta.url), type: "image/png" }],
+  ["/icons/icon-192.png", { source: new URL("../assets/icon-192.png", import.meta.url), type: "image/png" }],
+  ["/icons/icon-512.png", { source: new URL("../assets/icon-512.png", import.meta.url), type: "image/png" }]
+]);
 
 function json(response, status, payload) {
   response.writeHead(status, {
@@ -61,9 +70,26 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
       json(response, 200, {
         ok: true,
         device: config.deviceName,
-        version: "0.1.3",
+        version: "0.1.4",
         ...(instanceId ? { instanceId } : {})
       });
+      return;
+    }
+
+    const staticAsset = STATIC_ASSETS.get(requestUrl.pathname);
+    if (staticAsset && request.method === "GET") {
+      try {
+        const content = await readFile(staticAsset.source);
+        response.writeHead(200, {
+          "Content-Type": staticAsset.type,
+          "Content-Length": content.length,
+          "Cache-Control": "public, max-age=86400",
+          "X-Content-Type-Options": "nosniff"
+        });
+        response.end(content);
+      } catch {
+        json(response, 404, { error: "Icon asset not found." });
+      }
       return;
     }
 
@@ -73,6 +99,30 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
     }
 
     try {
+      if (requestUrl.pathname === "/manifest.webmanifest" && request.method === "GET") {
+        const manifest = {
+          name: "ClipBridge",
+          short_name: "ClipBridge",
+          description: "A lightweight clipboard bridge between iPhone and Windows.",
+          start_url: `/ui?token=${encodeURIComponent(config.token)}`,
+          scope: "/",
+          display: "standalone",
+          background_color: "#f3f0ff",
+          theme_color: "#6636f4",
+          icons: [
+            { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+            { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+          ]
+        };
+        response.writeHead(200, {
+          "Content-Type": "application/manifest+json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        });
+        response.end(JSON.stringify(manifest));
+        return;
+      }
+
       if (requestUrl.pathname === "/ui" && request.method === "GET") {
         response.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",

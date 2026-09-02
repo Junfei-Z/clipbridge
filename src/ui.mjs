@@ -1,12 +1,22 @@
 export function renderDashboard({ deviceName, token }) {
   const safeDeviceName = escapeHtml(deviceName);
   const safeToken = JSON.stringify(token);
+  const manifestHref = escapeHtml(`/manifest.webmanifest?token=${encodeURIComponent(token)}`);
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#6636f4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ClipBridge">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="${manifestHref}">
   <title>ClipBridge · ${safeDeviceName}</title>
   <style>
     :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f3f5f8; }
@@ -14,6 +24,8 @@ export function renderDashboard({ deviceName, token }) {
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
     main { width: min(680px, 100%); }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .brand { display: inline-flex; align-items: center; gap: 9px; }
+    .brand-icon { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 4px 8px #5f35f233); }
     h1 { font-size: 20px; margin: 0; }
     .status { display: inline-flex; align-items: center; gap: 7px; color: #657086; font-size: 14px; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #20b26b; box-shadow: 0 0 0 4px #20b26b22; }
@@ -37,7 +49,7 @@ export function renderDashboard({ deviceName, token }) {
 <body>
   <main>
     <header>
-      <h1>ClipBridge</h1>
+      <div class="brand"><img class="brand-icon" src="/favicon-32.png" alt=""><h1>ClipBridge</h1></div>
       <span class="status"><i class="dot"></i>${safeDeviceName}</span>
     </header>
     <section class="card">

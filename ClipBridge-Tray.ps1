@@ -106,8 +106,10 @@ $serverPath = Join-Path $PSScriptRoot "src\server.mjs"
 $stdoutLogPath = Join-Path $stateDirectory "server.log"
 $stderrLogPath = Join-Path $stateDirectory "server-error.log"
 $serverRecordPath = Join-Path $stateDirectory "server-process.json"
+$trayIconPath = Join-Path $PSScriptRoot "assets\clipbridge-tray.ico"
 $serverProcess = $null
 $notifyIcon = $null
+$trayIcon = $null
 $exitTimer = $null
 $mutex = $null
 $ownsMutex = $false
@@ -271,7 +273,13 @@ try {
     $exitItem = $menu.Items.Add("Exit")
 
     $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
-    $notifyIcon.Icon = [System.Drawing.SystemIcons]::Application
+    if (Test-Path -LiteralPath $trayIconPath) {
+        $trayIcon = New-Object System.Drawing.Icon -ArgumentList $trayIconPath
+        $notifyIcon.Icon = $trayIcon
+    }
+    else {
+        $notifyIcon.Icon = [System.Drawing.SystemIcons]::Application
+    }
     $notifyIcon.Text = "ClipBridge - $($config.deviceName)"
     $notifyIcon.ContextMenuStrip = $menu
     $notifyIcon.Visible = $true
@@ -324,6 +332,9 @@ finally {
     if ($notifyIcon) {
         $notifyIcon.Visible = $false
         $notifyIcon.Dispose()
+    }
+    if ($trayIcon) {
+        $trayIcon.Dispose()
     }
     if ($serverProcess -and -not $serverProcess.HasExited) {
         Stop-Process -Id $serverProcess.Id

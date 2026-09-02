@@ -56,6 +56,34 @@ test("serves the quick panel only to a paired request", async () => {
   });
 });
 
+test("serves unified app icons to devices on the private network", async () => {
+  await withServer(async (baseUrl) => {
+    const favicon = await fetch(`${baseUrl}/favicon.ico`);
+    assert.equal(favicon.status, 200);
+    assert.equal(favicon.headers.get("content-type"), "image/x-icon");
+    assert.ok((await favicon.arrayBuffer()).byteLength > 1000);
+
+    const appleIcon = await fetch(`${baseUrl}/apple-touch-icon.png`);
+    assert.equal(appleIcon.status, 200);
+    assert.equal(appleIcon.headers.get("content-type"), "image/png");
+  });
+});
+
+test("serves a paired installable web app manifest", async () => {
+  await withServer(async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/manifest.webmanifest?token=wrong`);
+    assert.equal(denied.status, 401);
+
+    const allowed = await fetch(`${baseUrl}/manifest.webmanifest?token=${"a".repeat(32)}`);
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get("content-type"), "application/manifest+json; charset=utf-8");
+    const manifest = await allowed.json();
+    assert.equal(manifest.start_url, `/ui?token=${"a".repeat(32)}`);
+    assert.equal(manifest.display, "standalone");
+    assert.deepEqual(manifest.icons.map(({ sizes }) => sizes), ["192x192", "512x512"]);
+  });
+});
+
 test("reports the runtime instance on the health endpoint", async () => {
   const server = createClipBridgeServer({
     config: { token: "a".repeat(32), deviceName: "Test PC", maxTextBytes: 1024 },
@@ -70,7 +98,7 @@ test("reports the runtime instance on the health endpoint", async () => {
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.1.3",
+      version: "0.1.4",
       instanceId: "tray-launch-123"
     });
   } finally {

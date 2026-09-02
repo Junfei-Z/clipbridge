@@ -7,6 +7,7 @@ ClipBridge is a lightweight, local-first clipboard bridge for Windows and iPhone
 - Read the current Windows text clipboard from an iPhone Shortcut.
 - Send text from an iPhone Shortcut directly into the Windows clipboard.
 - Preserve Unicode text, including Chinese, Emoji, accented characters, and line breaks.
+- Use the same friendly ClipBridge mascot in the Windows tray, browser tab, and iPhone Home Screen.
 - Pair with a randomly generated 192-bit token.
 - Reject connections that do not come from a private or loopback address.
 - Keep clipboard contents out of logs and persistent storage.
@@ -44,6 +45,10 @@ npm start
 On first launch, ClipBridge creates `.clipbridge/config.json` containing a random pairing token. Direct diagnostic mode prints the PC's local URLs and token; tray-mode logs deliberately omit both.
 
 It also prints a **Quick panel** URL. Open that URL on the iPhone to send or retrieve text immediately without building the Shortcuts first. Safari may require manual long-press copying because clipboard APIs are restricted on non-HTTPS local pages.
+
+### Add ClipBridge to the iPhone Home Screen
+
+Open the paired **Quick panel** URL in Safari, tap **Share**, then choose **Add to Home Screen**. The saved app opens in its own window and uses the same ClipBridge mascot as the Windows tray. Keep the full paired URL when adding it so the Home Screen app can reconnect without asking for the token again.
 
 Windows Firewall may ask whether Node.js can accept connections. Allow access only on private networks.
 

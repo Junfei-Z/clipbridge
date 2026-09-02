@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.4 - 2026-09-02
+
+### Added
+
+- A custom soft-jelly ClipBridge mascot replaces the generic Windows tray icon.
+- Safari, iPhone Home Screen, browser favicon, and installable web-app metadata now share the same visual identity.
+- iPhone Home Screen launches preserve the paired quick-panel URL.
+
+### Improved
+
+- Dedicated icon sizes keep the mascot crisp in tiny Windows tray slots and safely padded inside iOS icon masks.
+
 ## 0.1.3 - 2026-09-02
 
 ### Fixed
