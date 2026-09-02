@@ -136,8 +136,7 @@ try {
     if (-not $createdNew) {
         if (Test-Path -LiteralPath $configPath) {
             $existingConfig = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
-            $existingToken = [System.Uri]::EscapeDataString([string]$existingConfig.token)
-            $existingPanelUrl = "http://127.0.0.1:$($existingConfig.port)/ui?token=$existingToken"
+            $existingPanelUrl = "http://127.0.0.1:$($existingConfig.port)/ui"
             Start-Process $existingPanelUrl
         }
         [System.Windows.Forms.MessageBox]::Show(
@@ -262,13 +261,12 @@ try {
         throw "No local IPv4 address was found. Connect this PC to a private network and try again."
     }
 
-    $encodedToken = [System.Uri]::EscapeDataString([string]$config.token)
-    $pairingUrl = "http://$($address):$($config.port)/ui?token=$encodedToken"
-    $localPanelUrl = "http://127.0.0.1:$($config.port)/ui?token=$encodedToken"
+    $deviceUrl = "http://$($address):$($config.port)/ui"
+    $localPanelUrl = "http://127.0.0.1:$($config.port)/ui"
 
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $openItem = $menu.Items.Add("Open Quick Panel")
-    $copyItem = $menu.Items.Add("Copy Pairing URL")
+    $copyItem = $menu.Items.Add("Copy Device URL")
     $menu.Items.Add("-") | Out-Null
     $exitItem = $menu.Items.Add("Exit")
 
@@ -290,8 +288,8 @@ try {
     $openItem.Add_Click($openPanel)
     $notifyIcon.Add_DoubleClick($openPanel)
     $copyItem.Add_Click({
-        [System.Windows.Forms.Clipboard]::SetText($pairingUrl)
-        $notifyIcon.ShowBalloonTip(1800, "ClipBridge", "Pairing URL copied.", [System.Windows.Forms.ToolTipIcon]::Info)
+        [System.Windows.Forms.Clipboard]::SetText($deviceUrl)
+        $notifyIcon.ShowBalloonTip(2200, "ClipBridge", "Device URL copied. Create a one-time pairing code in the Windows panel.", [System.Windows.Forms.ToolTipIcon]::Info)
     })
     $exitItem.Add_Click({
         $notifyIcon.Visible = $false

@@ -1,6 +1,8 @@
-# iPhone Shortcut setup
+# iPhone Shortcut compatibility setup
 
-ClipBridge 0.1 uses two Apple Shortcuts. Replace the example URL and token with the values printed by `npm start`.
+ClipBridge 0.2 recommends pairing the Safari/Home Screen app with a one-time code. The manual Shortcuts below are retained for v0.1 compatibility and use the shared migration token in `.clipbridge/config.json`.
+
+Unlike a paired browser, these legacy Shortcuts do not yet have independent revocable identities. Treat the token as a password, and prefer the paired web app unless you specifically need Shortcut automation.
 
 ## Send to PC
 
@@ -45,4 +47,4 @@ Create a Shortcut named **Get from PC** with these actions:
 
 ## Privacy warning
 
-Version 0.1 uses unencrypted HTTP. Do not send passwords, recovery codes, private keys, or sensitive work information. Use this prototype only on a trusted private network.
+Version 0.2 still uses unencrypted HTTP on the local network. Do not send passwords, recovery codes, private keys, or sensitive work information. Use ClipBridge only on a trusted private network.

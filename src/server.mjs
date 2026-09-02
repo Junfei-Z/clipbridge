@@ -2,16 +2,21 @@ import { loadConfig } from "./config.mjs";
 import { readClipboardText, writeClipboardText } from "./clipboard-windows.mjs";
 import { createClipBridgeServer } from "./http.mjs";
 import { localIPv4Addresses } from "./network.mjs";
+import { loadDeviceRegistry } from "./devices.mjs";
 
 if (process.platform !== "win32") {
-  console.error("ClipBridge 0.1 currently runs on Windows only.");
+  console.error("ClipBridge 0.2 currently runs on Windows only.");
   process.exit(1);
 }
 
 const config = await loadConfig();
+const addresses = localIPv4Addresses();
+const devices = await loadDeviceRegistry(config.stateDir);
 const server = createClipBridgeServer({
   config,
   instanceId: process.env.CLIPBRIDGE_INSTANCE_ID || null,
+  devices,
+  pairingAddresses: addresses,
   clipboard: {
     readText: readClipboardText,
     writeText: writeClipboardText
@@ -23,11 +28,11 @@ server.listen(config.port, "0.0.0.0", () => {
   console.log("Use only on a trusted private network. This prototype does not encrypt HTTP traffic.");
   if (process.env.CLIPBRIDGE_LAUNCH_MODE !== "tray") {
     console.log("");
-    for (const address of localIPv4Addresses()) {
+    for (const address of addresses) {
       console.log(`Pairing base URL: http://${address}:${config.port}`);
-      console.log(`Quick panel: http://${address}:${config.port}/ui?token=${encodeURIComponent(config.token)}`);
+      console.log(`Quick panel: http://${address}:${config.port}/ui`);
     }
-    console.log(`Pairing token: ${config.token}`);
+    console.log("Open ClipBridge on this PC to pair a device with a one-time code or QR code.");
     console.log(`Config: ${config.configPath}`);
   }
 });

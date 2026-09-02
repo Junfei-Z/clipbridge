@@ -1,80 +1,113 @@
-# ClipBridge
+<p align="center">
+  <img src="assets/icon-512.png" width="128" height="128" alt="ClipBridge mascot">
+</p>
 
-ClipBridge is a lightweight, local-first clipboard bridge for Windows and iPhone. Version 0.1 is deliberately small: it synchronizes plain text over a trusted local network and exposes endpoints that work with Apple Shortcuts.
+<h1 align="center">ClipBridge</h1>
 
-## What works in 0.1
+<p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
 
-- Read the current Windows text clipboard from an iPhone Shortcut.
-- Send text from an iPhone Shortcut directly into the Windows clipboard.
-- Preserve Unicode text, including Chinese, Emoji, accented characters, and line breaks.
-- Use the same friendly ClipBridge mascot in the Windows tray, browser tab, and iPhone Home Screen.
-- Show a Windows clipboard manager locally and a direction-aware Send/Receive interface on remote devices.
-- Pair with a randomly generated 192-bit token.
-- Reject connections that do not come from a private or loopback address.
-- Keep clipboard contents out of logs and persistent storage.
-- Run with Node.js only; there are no third-party packages.
-- Open a responsive quick panel from an iPhone or another computer on the same private network.
+ClipBridge transfers plain text between a Windows PC, iPhone, Mac, and other devices on the same trusted private network. Version 0.2 replaces the prototype's shared link with real device pairing: each device receives its own identity and revocable access key.
 
-## Important security boundary
+## What works in 0.2
 
-This prototype uses authenticated HTTP but does **not** encrypt traffic. Run it only on a trusted private network. Do not expose port `39393` to the internet or use it on public Wi-Fi. End-to-end encryption and QR-based device identity are planned before a public release.
+- Pair an iPhone, iPad, Mac, Android device, or another computer with a one-time 6-digit code or local QR code.
+- Give every paired device an independent 256-bit access key.
+- Store only SHA-256 key hashes on Windows, never the usable device keys.
+- View paired device names and last-seen times from the Windows panel.
+- Revoke one device without breaking access for the others.
+- Send Unicode plain text to Windows and retrieve the current Windows clipboard.
+- Use a focused clipboard manager on Windows and direction-aware **Send** / **Receive** modes remotely.
+- Keep the same high-resolution ClipBridge mascot in the tray, browser, and iPhone Home Screen.
+- Continue opening v0.1 shared-token links during migration.
+
+## Security boundary
+
+Pairing and authorization are device-specific in 0.2, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
+
+Pairing codes expire after five minutes, work once, and rate-limit incorrect guesses. QR codes are generated locally; ClipBridge does not send pairing links or clipboard content to a QR service or other cloud service.
 
 ## Requirements
 
 - Windows 10 or later
 - Node.js 20 or later
-- iPhone and Windows PC connected to the same trusted Wi-Fi network
+- Windows and the other device connected to the same trusted Wi-Fi or private LAN
 
-## Start the Windows bridge
+## Start ClipBridge on Windows
 
-For the tray experience, double-click (running as administrator is not required):
+After downloading a source archive, open PowerShell in the extracted folder and install the single QR-code dependency once:
+
+```powershell
+npm install
+```
+
+ClipBridge can still start and pair by 6-digit code if this optional QR renderer is not installed, but the scannable QR image will be unavailable.
+
+Double-click:
 
 ```text
 Start-ClipBridge-Tray.cmd
 ```
 
-The temporary command window closes immediately. When the service is ready, ClipBridge opens the quick panel in your default browser and stays available from the Windows notification area. Double-clicking the launcher again opens the existing panel rather than starting a duplicate service.
+Administrator access is not required. The temporary command window closes, the local panel opens in the default browser, and ClipBridge remains available from the Windows notification area. Starting it again opens the existing panel instead of creating a duplicate service.
 
-If Windows or the tray process closes unexpectedly, the launcher can clean up the exact ClipBridge service it previously started. It validates a private process record before stopping anything; unrelated Node.js programs and manually started development servers are left alone.
-
-The tray menu can open the quick panel, copy the private pairing URL, or stop ClipBridge. For development and diagnostics, run the service directly:
+The tray menu can open the Windows panel, copy the device URL, or stop ClipBridge. For development and diagnostics, run:
 
 ```powershell
 npm start
 ```
 
-On first launch, ClipBridge creates `.clipbridge/config.json` containing a random pairing token. Direct diagnostic mode prints the PC's local URLs and token; tray-mode logs deliberately omit both.
+Windows Firewall may ask whether Node.js can accept connections. Allow it only on private networks.
 
-It also prints a **Quick panel** URL. Open that URL on the iPhone to send or retrieve text immediately without building the Shortcuts first. Safari may require manual long-press copying because clipboard APIs are restricted on non-HTTPS local pages.
+### Pair an iPhone or another device
+
+1. Open ClipBridge on the Windows PC.
+2. Under **Paired devices**, choose **Pair new device**.
+3. Scan the local QR code with the iPhone camera, or open the copied device URL and enter the 6-digit code.
+4. Confirm the device name and type, then choose **Secure pair**.
+5. The device keeps its own access key in local browser storage. The key is not placed in the URL.
+
+From Windows you can later review the device and choose **Revoke**. The revoked device immediately loses clipboard access while every other paired device continues working.
 
 ### Add ClipBridge to the iPhone Home Screen
 
-Open the paired **Quick panel** URL in Safari, tap **Share**, then choose **Add to Home Screen**. The saved app opens in its own window and uses the same ClipBridge mascot as the Windows tray. Keep the full paired URL when adding it so the Home Screen app can reconnect without asking for the token again.
-
-The interface adapts to the device opening it. Windows localhost shows the current Windows clipboard with **Reload** and **Save to clipboard** actions. iPhone, MacBook, and other devices on the private network get separate **Send** and **Receive** modes; received text can then be copied explicitly to that device.
-
-Remote panels also show the two ends of the current connection, such as **iPhone ↔ PC-20221004LAXX** or **Mac ↔ PC-20221004LAXX**. In 0.1 this is a friendly connection description inferred from the browser family, not yet a persistent or cryptographically verified device identity.
-
-Windows Firewall may ask whether Node.js can accept connections. Allow access only on private networks.
+After pairing in Safari, tap **Share**, then **Add to Home Screen**. The saved app opens without a token in its URL and uses the same ClipBridge icon as Windows. Safari may require manual long-press copying because clipboard APIs are restricted on non-HTTPS local pages.
 
 ### If startup fails
 
-ClipBridge displays an error dialog instead of leaving an empty command window open. Diagnostic details are written to `.clipbridge/server-error.log`. You can also run `npm start` in PowerShell to see the service output directly.
+ClipBridge shows an error dialog instead of leaving an empty command window. Diagnostic details are written to `.clipbridge/server-error.log`. You can also run `npm start` in PowerShell to see the service output directly.
 
-## Create the iPhone Shortcuts
+## Stored data
 
-See [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md). The first prototype uses two Shortcuts:
+ClipBridge keeps local settings in `.clipbridge/`:
 
-- **Send to PC**: reads the iPhone clipboard and sends it to Windows.
-- **Get from PC**: gets the Windows clipboard and copies it on iPhone.
+- `config.json` contains the port, Windows name, and the legacy v0.1 migration token.
+- `devices.json` contains device metadata and key hashes. Usable per-device keys are never written there.
+- Clipboard text is not added to logs or persistent history in 0.2.0.
+
+Clipboard history is intentionally scheduled for the next 0.2.x phase so retention controls can be designed separately from pairing.
+
+## Apple Shortcuts migration
+
+The paired web app is the recommended iPhone experience in 0.2. Existing v0.1 Apple Shortcuts continue to work with the legacy token while users migrate. See [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md) for the compatibility setup and its security trade-off.
 
 ## API
 
-All clipboard requests require:
+Paired remote requests use the device key returned by `POST /api/v1/pair`:
 
 ```text
-Authorization: Bearer <pairing-token>
+Authorization: Bearer <device-key>
 ```
+
+### Pair a device
+
+```http
+POST /api/v1/pair
+Content-Type: application/json
+
+{"code":"123456","name":"Junfei's iPhone","type":"iphone"}
+```
+
+Pairing-session creation, device listing, and revocation are restricted to Windows loopback requests.
 
 ### Read the Windows clipboard
 
@@ -91,6 +124,12 @@ Content-Type: application/json
 {"kind":"text","text":"Hello from iPhone"}
 ```
 
+### Inspect the current identity
+
+```http
+GET /api/v1/session
+```
+
 ### Health check
 
 ```http
@@ -99,16 +138,15 @@ GET /health
 
 ## Roadmap
 
-1. QR pairing and automatic device discovery.
-2. Native Windows tray UI.
-3. Images and screenshots.
-4. Native macOS menu bar client.
-5. iOS Share Extension and App Intents.
-6. End-to-end encrypted relay for devices on different networks.
+- **0.2.0:** Device identity, one-time pairing, QR pairing, device management, and revocation.
+- **0.2.x:** Clipboard history with source device, target device, timestamps, limits, and clear controls.
+- **0.3.0:** Full multi-device routing, named destinations, and a native Mac companion.
+- Later: images and screenshots, iOS Share Extension / App Intents, and an end-to-end encrypted cross-network relay.
 
 ## Development
 
 ```powershell
+npm install
 npm test
 ```
 

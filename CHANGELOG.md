@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 - 2026-09-02
+
+### Added
+
+- Real device pairing with five-minute, single-use 6-digit codes and locally generated QR codes.
+- Independent 256-bit access keys and persistent identities for each paired device.
+- A Windows device manager showing names, types, and last-seen times.
+- Per-device revocation from Windows and self-unpairing from remote devices.
+- Pairing attempt rate limits and hashed device-key storage.
+
+### Changed
+
+- The iPhone Home Screen app no longer needs a shared token in its URL.
+- Windows loopback access no longer needs an authentication token in the browser address.
+- The tray menu copies a device URL; Windows creates explicit one-time pairing sessions.
+- v0.1 shared-token links remain available as a clearly labeled migration path.
+- README branding now leads with the high-resolution ClipBridge mascot.
+
 ## 0.1.5 - 2026-09-02
 
 ### Improved
