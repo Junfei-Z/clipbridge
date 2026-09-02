@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.1 - 2026-09-01
+
+### Improved
+
+- Double-click startup now closes the temporary command window immediately.
+- The quick panel opens automatically only after the local service passes a health check.
+- Startup verifies a per-process instance ID, so another service on the same port cannot be mistaken for a successful launch.
+- A single-instance guard prevents duplicate tray and server processes.
+- Starting ClipBridge again opens the existing quick panel instead of starting another server.
+- Startup failures now show a clear dialog and write diagnostics to `.clipbridge/server-error.log`.
+- Tray-mode logs no longer contain the pairing token or private pairing URL.
+
 ## 0.1.0 - 2026-09-01
 
 ### Added

@@ -24,11 +24,13 @@ This prototype uses authenticated HTTP but does **not** encrypt traffic. Run it 
 
 ## Start the Windows bridge
 
-For the native tray experience, double-click:
+For the tray experience, double-click (running as administrator is not required):
 
 ```text
 Start-ClipBridge-Tray.cmd
 ```
+
+The temporary command window closes immediately. When the service is ready, ClipBridge opens the quick panel in your default browser and stays available from the Windows notification area. Double-clicking the launcher again opens the existing panel rather than starting a duplicate service.
 
 The tray menu can open the quick panel, copy the private pairing URL, or stop ClipBridge. For development and diagnostics, run the service directly:
 
@@ -36,11 +38,15 @@ The tray menu can open the quick panel, copy the private pairing URL, or stop Cl
 npm start
 ```
 
-On first launch, ClipBridge creates `.clipbridge/config.json` containing a random pairing token. The terminal prints the PC's local URLs and token.
+On first launch, ClipBridge creates `.clipbridge/config.json` containing a random pairing token. Direct diagnostic mode prints the PC's local URLs and token; tray-mode logs deliberately omit both.
 
 It also prints a **Quick panel** URL. Open that URL on the iPhone to send or retrieve text immediately without building the Shortcuts first. Safari may require manual long-press copying because clipboard APIs are restricted on non-HTTPS local pages.
 
 Windows Firewall may ask whether Node.js can accept connections. Allow access only on private networks.
+
+### If startup fails
+
+ClipBridge displays an error dialog instead of leaving an empty command window open. Diagnostic details are written to `.clipbridge/server-error.log`. You can also run `npm start` in PowerShell to see the service output directly.
 
 ## Create the iPhone Shortcuts
 

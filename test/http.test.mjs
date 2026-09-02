@@ -55,3 +55,25 @@ test("serves the quick panel only to a paired request", async () => {
     assert.match(await allowed.text(), /发送到 Windows/);
   });
 });
+
+test("reports the runtime instance on the health endpoint", async () => {
+  const server = createClipBridgeServer({
+    config: { token: "a".repeat(32), deviceName: "Test PC", maxTextBytes: 1024 },
+    clipboard: { readText: async () => "", writeText: async () => {} },
+    instanceId: "tray-launch-123"
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/health`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      device: "Test PC",
+      version: "0.1.1",
+      instanceId: "tray-launch-123"
+    });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

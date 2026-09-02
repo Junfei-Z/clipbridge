@@ -47,7 +47,7 @@ async function readJson(request, maxBytes) {
   }
 }
 
-export function createClipBridgeServer({ config, clipboard, now = () => Date.now() }) {
+export function createClipBridgeServer({ config, clipboard, now = () => Date.now(), instanceId = null }) {
   return http.createServer(async (request, response) => {
     const requestUrl = new URL(request.url, "http://localhost");
     const remoteAddress = request.socket.remoteAddress ?? "";
@@ -58,7 +58,12 @@ export function createClipBridgeServer({ config, clipboard, now = () => Date.now
     }
 
     if (requestUrl.pathname === "/health" && request.method === "GET") {
-      json(response, 200, { ok: true, device: config.deviceName, version: "0.1.0" });
+      json(response, 200, {
+        ok: true,
+        device: config.deviceName,
+        version: "0.1.1",
+        ...(instanceId ? { instanceId } : {})
+      });
       return;
     }
 

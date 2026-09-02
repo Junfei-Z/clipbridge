@@ -11,6 +11,7 @@ if (process.platform !== "win32") {
 const config = await loadConfig();
 const server = createClipBridgeServer({
   config,
+  instanceId: process.env.CLIPBRIDGE_INSTANCE_ID || null,
   clipboard: {
     readText: readClipboardText,
     writeText: writeClipboardText
@@ -20,13 +21,15 @@ const server = createClipBridgeServer({
 server.listen(config.port, "0.0.0.0", () => {
   console.log(`ClipBridge is running as ${config.deviceName}.`);
   console.log("Use only on a trusted private network. This prototype does not encrypt HTTP traffic.");
-  console.log("");
-  for (const address of localIPv4Addresses()) {
-    console.log(`Pairing base URL: http://${address}:${config.port}`);
-    console.log(`Quick panel: http://${address}:${config.port}/ui?token=${encodeURIComponent(config.token)}`);
+  if (process.env.CLIPBRIDGE_LAUNCH_MODE !== "tray") {
+    console.log("");
+    for (const address of localIPv4Addresses()) {
+      console.log(`Pairing base URL: http://${address}:${config.port}`);
+      console.log(`Quick panel: http://${address}:${config.port}/ui?token=${encodeURIComponent(config.token)}`);
+    }
+    console.log(`Pairing token: ${config.token}`);
+    console.log(`Config: ${config.configPath}`);
   }
-  console.log(`Pairing token: ${config.token}`);
-  console.log(`Config: ${config.configPath}`);
 });
 
 function stop() {
