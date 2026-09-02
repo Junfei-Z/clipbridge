@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { DeviceRegistry } from "../src/devices.mjs";
+import { FileTransferStore } from "../src/files.mjs";
 import { HistoryStore } from "../src/history.mjs";
 import { InboxStore } from "../src/inbox.mjs";
 import { createClipBridgeServer } from "../src/http.mjs";
@@ -15,8 +19,10 @@ async function withServer(run) {
   const devices = new DeviceRegistry({ now });
   const history = new HistoryStore({ now });
   const inbox = new InboxStore({ now });
+  const stateDir = await mkdtemp(path.join(os.tmpdir(), "clipbridge-http-files-"));
+  const files = new FileTransferStore({ stateDir, now, maxFileBytes: 1024 * 1024, maxTotalBytes: 4 * 1024 * 1024, ttlMs: 60_000 });
   const server = createClipBridgeServer({
-    config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024, port: 39393 },
+    config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024, maxFileBytes: 1024 * 1024, maxFileTotalBytes: 4 * 1024 * 1024, fileTtlMs: 60_000, port: 39393, stateDir },
     clipboard: {
       readText: async () => value,
       writeText: async (next) => { value = next; }
@@ -25,6 +31,7 @@ async function withServer(run) {
     devices,
     history,
     inbox,
+    files,
     pairing: new PairingManager({ now }),
     pairingAddresses: ["192.168.1.23"],
     isLocalRequest: (_address, request) => request.headers["x-clipbridge-test-local"] === "1"
@@ -32,9 +39,10 @@ async function withServer(run) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const { port } = server.address();
-    await run(`http://127.0.0.1:${port}`, () => value, { devices, history, inbox });
+    await run(`http://127.0.0.1:${port}`, () => value, { devices, history, inbox, files });
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    await rm(stateDir, { recursive: true, force: true });
   }
 }
 
@@ -222,6 +230,48 @@ test("routes text between paired devices through isolated local inboxes", async 
   });
 });
 
+test("relays files between paired devices with isolated one-time downloads", async () => {
+  await withServer(async (baseUrl, _currentValue, { devices }) => {
+    const android = await devices.register({ name: "Android 手机", type: "android" });
+    const iphone = await devices.register({ name: "Junfei 的 iPhone", type: "iphone" });
+    const androidAuth = { Authorization: `Bearer ${android.token}` };
+    const iphoneAuth = { Authorization: `Bearer ${iphone.token}` };
+    const content = Buffer.from("来自 Android 的文件 🥳", "utf8");
+
+    const upload = await fetch(`${baseUrl}/api/v1/file-transfers?targetId=${encodeURIComponent(iphone.device.id)}&name=${encodeURIComponent("测试文件.svg")}`, {
+      method: "POST",
+      headers: { ...androidAuth, "Content-Type": "image/svg+xml" },
+      body: content
+    });
+    assert.equal(upload.status, 201);
+    const uploaded = await upload.json();
+    assert.equal(uploaded.transfer.name, "测试文件.svg");
+    assert.equal(uploaded.transfer.previewKind, "text");
+
+    assert.deepEqual((await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: androidAuth })).json()).transfers, []);
+    const iphoneInbox = await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: iphoneAuth })).json();
+    assert.equal(iphoneInbox.transfers[0].source.id, android.device.id);
+    assert.equal(iphoneInbox.transfers[0].sha256, uploaded.transfer.sha256);
+
+    assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}/download`, { method: "POST", headers: androidAuth })).status, 404);
+    const ticketResponse = await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}/download?inline=1`, { method: "POST", headers: iphoneAuth });
+    assert.equal(ticketResponse.status, 201);
+    const ticket = await ticketResponse.json();
+    assert.doesNotMatch(ticket.url, /token|Bearer|device/i);
+
+    const download = await fetch(`${baseUrl}${ticket.url}`);
+    assert.equal(download.status, 200);
+    assert.equal(download.headers.get("content-type"), "text/plain; charset=utf-8");
+    assert.equal(download.headers.get("x-content-type-options"), "nosniff");
+    assert.deepEqual(Buffer.from(await download.arrayBuffer()), content);
+    assert.equal((await fetch(`${baseUrl}${ticket.url}`)).status, 404);
+
+    assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}`, { method: "DELETE", headers: androidAuth })).status, 404);
+    assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}`, { method: "DELETE", headers: iphoneAuth })).status, 200);
+    assert.deepEqual((await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: iphoneAuth })).json()).transfers, []);
+  });
+});
+
 test("keeps v0.1 bearer links working during migration", async () => {
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/session`, {
@@ -271,7 +321,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.3.0 and the runtime instance on the health endpoint", async () => {
+test("reports v0.4.0 and the runtime instance on the health endpoint", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -284,7 +334,7 @@ test("reports v0.3.0 and the runtime instance on the health endpoint", async () 
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.3.0",
+      version: "0.4.0",
       instanceId: "tray-launch-123"
     });
   } finally {

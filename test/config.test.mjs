@@ -3,7 +3,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { loadConfig } from "../src/config.mjs";
+import { DEFAULT_FILE_TTL_MS, DEFAULT_MAX_FILE_BYTES, DEFAULT_MAX_FILE_TOTAL_BYTES, loadConfig } from "../src/config.mjs";
 
 test("loadConfig creates and reuses a secure token", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "clipbridge-config-"));
@@ -14,4 +14,24 @@ test("loadConfig creates and reuses a secure token", async () => {
   assert.ok(first.token.length >= 24);
   const saved = JSON.parse(await readFile(first.configPath, "utf8"));
   assert.equal(saved.token, first.token);
+  assert.equal(first.maxFileBytes, DEFAULT_MAX_FILE_BYTES);
+  assert.equal(first.maxFileTotalBytes, DEFAULT_MAX_FILE_TOTAL_BYTES);
+  assert.equal(first.fileTtlMs, DEFAULT_FILE_TTL_MS);
+});
+
+test("loadConfig applies file defaults to an existing pre-0.4 config", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "clipbridge-old-config-"));
+  const stateDir = path.join(root, ".clipbridge");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(stateDir, { recursive: true });
+  await writeFile(path.join(stateDir, "config.json"), JSON.stringify({
+    port: 39393,
+    token: "a".repeat(32),
+    maxTextBytes: 65536,
+    deviceName: "Old ClipBridge"
+  }));
+  const config = await loadConfig(root);
+  assert.equal(config.maxFileBytes, DEFAULT_MAX_FILE_BYTES);
+  assert.equal(config.maxFileTotalBytes, DEFAULT_MAX_FILE_TOTAL_BYTES);
+  assert.equal(config.fileTtlMs, DEFAULT_FILE_TTL_MS);
 });

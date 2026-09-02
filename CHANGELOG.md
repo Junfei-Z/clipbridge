@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 - Unreleased
+
+### Added
+
+- A separate **Text / Files** experience on paired phones, tablets, and Macs, plus a dedicated file relay card on Windows.
+- Named-target file transfer for photos, videos, PDFs, SVG, source code, archives, and arbitrary binary files.
+- Streaming uploads with aggregate progress, multiple-file queues, and cancellation.
+- Target-scoped file inboxes with safe preview, download, single-delete, and clear controls.
+- SHA-256 integrity metadata, 24-hour expiry, a 256 MB per-file default limit, and a 1 GB temporary-storage quota.
+- Short-lived, single-use download tickets that keep paired-device access keys out of download URLs.
+
+### Security
+
+- File bytes are stored under random IDs and never use the supplied filename as a Windows path.
+- Unknown files always download as inert attachments; SVG, HTML, scripts, and source code preview as plain text and are never injected into the ClipBridge page.
+- A paired device can only list, preview, download, or delete files addressed to its own identity.
+- Revoking either the source or target device removes its queued file transfers.
+
 ## 0.3.0 - 2026-09-02
 
 ### Added
