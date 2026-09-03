@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
-import { FileTransferStore, filePresentation } from "./files.mjs";
+import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -11,7 +11,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.4.0";
+const APP_VERSION = "0.4.1";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -81,6 +81,22 @@ function legacyIdentity(clientDevice) {
 
 function transferEndpoint(identity) {
   return { id: identity.id, name: identity.name, type: identity.type };
+}
+
+function normalizeTargetIds(value) {
+  const values = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+  if (values.length < 1 || values.length > MAX_FILE_TARGETS || values.some((id) => typeof id !== "string" || !id || id.length > 128)) {
+    return null;
+  }
+  return [...new Set(values)];
+}
+
+function resolveTargets(targetIds, { config, devices, identity }) {
+  const targets = targetIds.map((targetId) => targetId === "windows-host"
+    ? transferEndpoint(localIdentity(config))
+    : devices.get(targetId));
+  if (targets.some((target) => !target || target.id === identity.id)) return null;
+  return targets.map(transferEndpoint);
 }
 
 function contentDisposition(name, disposition = "attachment") {
@@ -205,7 +221,17 @@ export function createClipBridgeServer({
         json(response, 404, { error: "下载链接已失效，请重新点击下载。" });
         return;
       }
-      const entry = files.get(ticket.entryId, ticket.targetId);
+      let entry = files.get(ticket.entryId, ticket.targetId);
+      if (!entry) {
+        json(response, 404, { error: "文件不存在或已经过期。" });
+        return;
+      }
+      try {
+        entry = await files.markDownloaded(entry.id, ticket.targetId);
+      } catch {
+        json(response, 500, { error: "无法更新文件投递状态，请重试。" });
+        return;
+      }
       if (!entry) {
         json(response, 404, { error: "文件不存在或已经过期。" });
         return;
@@ -221,7 +247,7 @@ export function createClipBridgeServer({
         "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff"
       });
-      const stream = files.createReadStream(entry.id);
+      const stream = files.createReadStream(entry.blobId);
       stream.on("error", () => response.destroy());
       stream.pipe(response);
       return;
@@ -369,35 +395,40 @@ export function createClipBridgeServer({
           json(response, 403, { error: "多设备传输需要使用 v0.2 设备配对。", code: "SECURE_PAIRING_REQUIRED" });
           return;
         }
-        const body = await readJson(request, config.maxTextBytes + 4096);
-        if (body?.kind !== "text" || typeof body.text !== "string" || typeof body.targetId !== "string") {
-          json(response, 400, { error: "Expected { kind: 'text', text: string, targetId: string }." });
+        const body = await readJson(request, config.maxTextBytes + 16_384);
+        const targetIds = normalizeTargetIds(Array.isArray(body?.targetIds) ? body.targetIds : body?.targetId);
+        if (body?.kind !== "text" || typeof body.text !== "string" || !targetIds) {
+          json(response, 400, { error: "Expected { kind: 'text', text: string, targetIds: string[] }." });
           return;
         }
         if (Buffer.byteLength(body.text, "utf8") > config.maxTextBytes) {
           json(response, 413, { error: `Text exceeds ${config.maxTextBytes} bytes.` });
           return;
         }
-        const target = body.targetId === "windows-host"
-          ? transferEndpoint(localIdentity(config))
-          : devices.get(body.targetId);
-        if (!target || target.id === identity.id) {
+        const targets = resolveTargets(targetIds, { config, devices, identity });
+        if (!targets) {
           json(response, 404, { error: "没有找到可接收的目标设备。" });
           return;
         }
         const source = transferEndpoint(identity);
-        let transfer;
-        let delivery;
-        if (target.id === "windows-host") {
-          await clipboard.writeText(body.text);
-          transfer = await history.add({ text: body.text, source, target });
-          delivery = "clipboard";
-        } else {
-          transfer = await inbox.deliver({ text: body.text, source, target });
-          await history.add({ text: body.text, source, target });
-          delivery = "inbox";
+        const deliveries = [];
+        for (const target of targets) {
+          if (target.id === "windows-host") {
+            await clipboard.writeText(body.text);
+            const transfer = await history.add({ text: body.text, source, target });
+            deliveries.push({ target, status: "delivered", delivery: "clipboard", transfer });
+          } else {
+            const transfer = await inbox.deliver({ text: body.text, source, target });
+            await history.add({ text: body.text, source, target });
+            deliveries.push({ target, status: "queued", delivery: "inbox", transfer });
+          }
         }
-        json(response, 201, { transfer, delivery });
+        json(response, 201, {
+          batchId: randomUUID(),
+          deliveries,
+          transfer: deliveries[0].transfer,
+          delivery: deliveries[0].delivery
+        });
         return;
       }
 
@@ -406,26 +437,53 @@ export function createClipBridgeServer({
           json(response, 403, { error: "文件传输需要使用安全设备配对。", code: "SECURE_PAIRING_REQUIRED" });
           return;
         }
-        const targetId = requestUrl.searchParams.get("targetId") ?? "";
+        const requestedTargetIds = requestUrl.searchParams.getAll("targetId");
+        if (!requestedTargetIds.length && requestUrl.searchParams.has("targetIds")) {
+          requestedTargetIds.push(...requestUrl.searchParams.get("targetIds").split(","));
+        }
+        const targetIds = normalizeTargetIds(requestedTargetIds);
         const name = requestUrl.searchParams.get("name") ?? "";
-        const target = targetId === "windows-host"
-          ? transferEndpoint(localIdentity(config))
-          : devices.get(targetId);
-        if (!target || target.id === identity.id) {
+        if (!targetIds) {
+          json(response, 400, { error: "请至少选择一台接收设备。" });
+          return;
+        }
+        const targets = resolveTargets(targetIds, { config, devices, identity });
+        if (!targets) {
           json(response, 404, { error: "没有找到可接收的目标设备。" });
           return;
         }
         const contentLengthHeader = request.headers["content-length"];
         const declaredBytes = contentLengthHeader === undefined ? null : Number(contentLengthHeader);
-        const transfer = await files.receive({
+        const batch = await files.receive({
           stream: request,
           name,
           mimeType: request.headers["content-type"] ?? "",
           declaredBytes,
           source: transferEndpoint(identity),
-          target: transferEndpoint(target)
+          targets
         });
-        json(response, 201, { transfer, delivery: "file-inbox" });
+        const deliveries = batch.deliveries.map((transfer) => ({
+          target: transfer.target,
+          status: transfer.status,
+          delivery: "file-inbox",
+          transfer
+        }));
+        json(response, 201, {
+          blobId: batch.blobId,
+          deliveries,
+          transfer: deliveries[0].transfer,
+          delivery: deliveries[0].delivery
+        });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/file-outbox" && request.method === "GET") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才可以查看文件投递状态。" });
+          return;
+        }
+        await files.cleanupExpired();
+        json(response, 200, { transfers: files.listBySource(identity.id) });
         return;
       }
 

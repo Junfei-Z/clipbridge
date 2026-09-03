@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1 - Unreleased
+
+### Added
+
+- One-to-many text and file sending from Windows or any securely paired device.
+- Mobile-friendly multi-select destination cards instead of a single-target dropdown.
+- A sender outbox showing independent pending and downloaded status for every file recipient.
+
+### Changed
+
+- Multi-recipient files now share one on-disk Blob while retaining separate target-scoped delivery records.
+- Deleting or downloading one delivery no longer changes another recipient's access or state.
+- Existing v0.4 single-target file metadata is loaded through an automatic compatibility migration.
+
 ## 0.4.0 - 2026-09-03
 
 ### Added

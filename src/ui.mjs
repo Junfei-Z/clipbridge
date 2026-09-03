@@ -61,7 +61,13 @@ export function renderDashboard({
     .form-grid .full { grid-column: 1 / -1; }
     .destination { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 14px; }
     .destination button { min-height: 49px; }
-    #send-target { margin-bottom: 14px; }
+    .target-block { display: grid; gap: 7px; min-width: 0; }
+    .target-label { color: #59647a; font-size: 13px; font-weight: 650; }
+    .target-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .target-option { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 10px 11px; border: 1px solid #e5e8ef; border-radius: 13px; color: #59647a; background: #fafbfc; cursor: pointer; font-size: 13px; font-weight: 650; }
+    .target-option:has(input:checked) { color: #4e2ad5; border-color: #8c70f7; background: #f4f0ff; box-shadow: 0 0 0 3px #6b45f212; }
+    .target-option input { flex: 0 0 auto; width: 17px; height: 17px; margin: 0; padding: 0; accent-color: #5f35f2; }
+    .target-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .code-input { text-align: center; font: 750 24px/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .22em; }
     .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     button { appearance: none; border: 0; border-radius: 13px; padding: 12px 16px; font: inherit; font-weight: 650; cursor: pointer; transition: transform .12s, opacity .12s, background .12s; }
@@ -114,6 +120,9 @@ export function renderDashboard({
     progress { width: 100%; height: 9px; margin-top: 12px; accent-color: #5f35f2; }
     .file-name { margin: 8px 0 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 720; }
     .file-detail { margin-top: 5px; color: #7b8497; font-size: 12px; }
+    .delivery-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .delivery-chip { padding: 5px 8px; border-radius: 999px; color: #735b20; background: #fff4ca; font-size: 11px; font-weight: 700; }
+    .delivery-chip[data-status="downloaded"], .delivery-chip[data-status="delivered"] { color: #167148; background: #dff7ea; }
     .inbox-divider { height: 1px; margin: 22px 0; border: 0; background: #eceef3; }
     .empty { padding: 18px 8px; color: #8a93a6; text-align: center; font-size: 13px; }
     .notice { margin-bottom: 16px; padding: 11px 13px; color: #664f18; background: #fff7d8; border: 1px solid #f0df9c; border-radius: 13px; font-size: 12px; line-height: 1.5; }
@@ -143,7 +152,8 @@ export function renderDashboard({
       textarea, input, select { color: inherit; background: #151920; border-color: #303744; }
       textarea[readonly] { color: #d8ddea; }
       .secondary, .tabs { background: #303744; color: #eef1f7; }
-      .mode-tab, .file-picker { color: #d8ddea; background: #222631; border-color: #3b4050; }
+      .mode-tab, .file-picker, .target-option { color: #d8ddea; background: #222631; border-color: #3b4050; }
+      .target-option:has(input:checked) { color: #fff; background: #33265a; border-color: #8c70f7; }
       .tab { color: #aeb7c8; }
       .tab[aria-selected="true"] { color: #fff; background: #5f35f2; box-shadow: none; }
       .pairing, .pair-box { border-color: #3b4050; background: linear-gradient(135deg, #23202f, #1d2731); }
@@ -223,6 +233,47 @@ export function renderDashboard({
       return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
     }
 
+    function selectedTargetIds(container) {
+      return [...container.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+    }
+
+    function renderTargetPicker(container, targets, selectedIds = []) {
+      const selected = new Set(selectedIds);
+      container.replaceChildren();
+      if (!targets.length) {
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '没有可用的接收设备'; container.append(empty); return;
+      }
+      for (const target of targets) {
+        const option = document.createElement('label'); option.className = 'target-option';
+        const input = document.createElement('input'); input.type = 'checkbox'; input.value = target.id; input.checked = selected.has(target.id);
+        const text = document.createElement('span'); text.textContent = deviceIcon(target.type) + ' ' + target.name;
+        input.addEventListener('change', () => container.dispatchEvent(new Event('targetschange')));
+        option.append(input, text); container.append(option);
+      }
+    }
+
+    function deliverySummary(deliveries) {
+      return deliveries.map(({ target, status }) => target.name + '：' + (status === 'delivered' ? '已送达' : status === 'downloaded' ? '已下载' : '待接收')).join('；');
+    }
+
+    function renderFileOutbox(container, batches) {
+      container.replaceChildren();
+      if (!batches.length) {
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '还没有发送中的文件'; container.append(empty); return;
+      }
+      for (const batch of batches) {
+        const item = document.createElement('article'); item.className = 'history-item';
+        const name = document.createElement('p'); name.className = 'file-name'; name.textContent = batch.name;
+        const detail = document.createElement('div'); detail.className = 'file-detail'; detail.textContent = formatBytes(batch.bytes) + ' · 上传一次，共享给 ' + batch.deliveries.length + ' 台设备';
+        const chips = document.createElement('div'); chips.className = 'delivery-chips';
+        for (const delivery of batch.deliveries) {
+          const chip = document.createElement('span'); chip.className = 'delivery-chip'; chip.dataset.status = delivery.status;
+          chip.textContent = delivery.target.name + ' · ' + (delivery.status === 'downloaded' ? '已下载' : '待接收'); chips.append(chip);
+        }
+        item.append(name, detail, chips); container.append(item);
+      }
+    }
+
     function renderFileList(container, entries, { onOpen, onDownload, onDelete }) {
       container.replaceChildren();
       if (!entries.length) {
@@ -245,9 +296,10 @@ export function renderDashboard({
       }
     }
 
-    function uploadFile(file, targetId, token, onProgress, onStart = () => {}) {
+    function uploadFile(file, targetIds, token, onProgress, onStart = () => {}) {
       return new Promise((resolve, reject) => {
-        const query = new URLSearchParams({ targetId, name: file.name });
+        const query = new URLSearchParams({ name: file.name });
+        for (const targetId of targetIds) query.append('targetId', targetId);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/v1/file-transfers?' + query);
         if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
@@ -281,8 +333,8 @@ function renderLocalPanel(fileLimitLabel) {
       </div>
       <textarea id="local-clip" aria-label="Windows 剪贴板内容" placeholder="正在读取 Windows 剪贴板…"></textarea>
       <div class="destination">
-        <label>发送到已配对设备<select id="local-target" aria-label="目标设备"><option value="">正在读取设备…</option></select></label>
-        <button class="primary" id="send-local-target" disabled><span class="button-icon" aria-hidden="true">→</span>发送给设备</button>
+        <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="local-target" role="group" aria-label="文字接收设备"><div class="empty">正在读取设备…</div></div></div>
+        <button class="primary" id="send-local-target" disabled><span class="button-icon" aria-hidden="true">→</span>发送给所选设备</button>
       </div>
       <div class="actions">
         <button class="secondary" id="refresh-local"><span class="button-icon" aria-hidden="true">↻</span>重新读取</button>
@@ -304,12 +356,15 @@ function renderLocalPanel(fileLimitLabel) {
         <div><div class="eyebrow">局域网文件中转</div><h2 id="local-files-title">文件</h2></div>
         <button class="quiet" id="refresh-local-files">刷新收件箱</button>
       </div>
-      <p class="helper">把文件发送给已配对设备，或接收发给这台 Windows 的文件。文件默认在本机保留 24 小时。</p>
-      <label>目标设备<select id="local-file-target" aria-label="文件目标设备"><option value="">正在读取设备…</option></select></label>
+      <p class="helper">一次上传可以共享给多台已配对设备；每台设备的接收和下载状态互不影响。文件默认在本机保留 24 小时。</p>
+      <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="local-file-target" role="group" aria-label="文件接收设备"><div class="empty">正在读取设备…</div></div></div>
       <label class="file-picker">选择一个或多个文件<input id="local-file-input" type="file" multiple><span class="file-summary" id="local-file-summary">单文件上限 ${fileLimitLabel}</span></label>
       <progress id="local-file-progress" max="1" value="0" hidden></progress>
       <div class="actions"><button class="primary" id="send-local-files" disabled>发送文件</button><button class="secondary" id="cancel-local-files" hidden>取消上传</button></div>
       <div class="message" id="local-file-message" role="status" aria-live="polite"></div>
+      <hr class="inbox-divider">
+      <div class="row-heading inbox-heading"><div><div class="eyebrow">共享 Blob · 独立投递</div><h3>最近发送状态</h3></div></div>
+      <div class="inbox-list" id="local-file-outbox"><div class="empty">正在读取发送状态…</div></div>
       <hr class="inbox-divider">
       <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → Windows</div><h3>文件收件箱</h3></div><button class="quiet danger" id="clear-local-files">清空</button></div>
       <div class="inbox-list" id="local-file-list"><div class="empty">正在检查文件…</div></div>
@@ -376,10 +431,10 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
         <button class="tab" id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel" data-tab="history">历史</button>
       </div>
       <section id="send-panel" role="tabpanel" aria-labelledby="send-tab">
-        <div class="section-heading"><div class="eyebrow">选择明确的目标</div><h2>发送到另一台设备</h2><p class="helper">发给 Windows 会立即写入剪贴板；其他设备会在自己的收件箱中收到。</p></div>
-        <label>目标设备<select id="send-target" aria-label="发送目标"><option value="windows-host">${deviceName}</option></select></label>
+        <div class="section-heading"><div class="eyebrow">一次选择一个或多个目标</div><h2>发送到所选设备</h2><p class="helper">发给 Windows 会立即写入剪贴板；其他设备会各自在自己的收件箱中收到。</p></div>
+        <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="send-target" role="group" aria-label="文字发送目标"><div class="empty">正在读取设备…</div></div></div>
         <textarea id="send-text" aria-label="要发送到电脑的内容" placeholder="在这里粘贴或输入…"></textarea>
-        <div class="actions"><button class="primary" id="send-to-computer"><span class="button-icon" aria-hidden="true">↑</span>发送</button></div>
+        <div class="actions"><button class="primary" id="send-to-computer" disabled><span class="button-icon" aria-hidden="true">↑</span>发送</button></div>
       </section>
       <section id="receive-panel" role="tabpanel" aria-labelledby="receive-tab" hidden>
         <div class="row-heading inbox-heading">
@@ -405,12 +460,15 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
       </section>
       </div>
       <section id="file-workspace" hidden>
-        <div class="section-heading"><div class="eyebrow">通过 Windows 临时中转</div><h2>发送文件</h2><p class="helper">文件只保存在这台 Windows 上，默认 24 小时后自动清理。</p></div>
-        <label>目标设备<select id="file-target" aria-label="文件发送目标"><option value="windows-host">${deviceName}</option></select></label>
+        <div class="section-heading"><div class="eyebrow">上传一次，共享给多台设备</div><h2>发送文件</h2><p class="helper">Windows 只保存一份文件 Blob，各接收设备拥有独立状态；默认 24 小时后自动清理。</p></div>
+        <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="file-target" role="group" aria-label="文件发送目标"><div class="empty">正在读取设备…</div></div></div>
         <label class="file-picker">选择照片、视频、PDF、代码或其他文件<input id="file-input" type="file" multiple><span class="file-summary" id="file-summary">单文件上限 ${fileLimitLabel}</span></label>
         <progress id="file-progress" max="1" value="0" hidden></progress>
         <div class="actions"><button class="primary" id="send-files" disabled>发送文件</button><button class="secondary" id="cancel-files" hidden>取消上传</button><button class="secondary" id="refresh-files">刷新收件箱</button></div>
         <div class="message" id="file-message" role="status" aria-live="polite"></div>
+        <hr class="inbox-divider">
+        <div class="row-heading inbox-heading"><div><div class="eyebrow">共享 Blob · 独立投递</div><h2>最近发送状态</h2></div></div>
+        <div class="inbox-list" id="file-outbox"><div class="empty">正在读取发送状态…</div></div>
         <hr class="inbox-divider">
         <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → 此设备</div><h2>文件收件箱</h2></div><button class="quiet danger" id="clear-files">清空</button></div>
         <div class="inbox-list" id="file-list"><div class="empty">正在检查文件…</div></div>
@@ -443,6 +501,7 @@ function localModeScript({ fileLimitLabel }) {
     const localFileSummary = document.querySelector('#local-file-summary');
     const localFileProgress = document.querySelector('#local-file-progress');
     const localFileList = document.querySelector('#local-file-list');
+    const localFileOutbox = document.querySelector('#local-file-outbox');
     const localFileMessage = document.querySelector('#local-file-message');
     const sendLocalFiles = document.querySelector('#send-local-files');
     const cancelLocalFiles = document.querySelector('#cancel-local-files');
@@ -486,22 +545,12 @@ function localModeScript({ fileLimitLabel }) {
     async function refreshPeers() {
       try {
         const data = await apiJson('/api/v1/peers');
-        const selected = localTarget.value;
-        const selectedFileTarget = localFileTarget.value;
-        localTarget.replaceChildren();
-        localFileTarget.replaceChildren();
-        for (const target of data.targets) {
-          const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; localTarget.append(option);
-          const fileOption = option.cloneNode(true); localFileTarget.append(fileOption);
-        }
-        if (data.targets.some((target) => target.id === selected)) localTarget.value = selected;
-        if (data.targets.some((target) => target.id === selectedFileTarget)) localFileTarget.value = selectedFileTarget;
-        if (!data.targets.length) {
-          const option = document.createElement('option'); option.value = ''; option.textContent = '还没有其他已配对设备'; localTarget.append(option);
-          localFileTarget.append(option.cloneNode(true));
-        }
-        sendLocalTarget.disabled = !data.targets.length;
-        sendLocalFiles.disabled = !data.targets.length || !localFileInput.files.length;
+        const selected = selectedTargetIds(localTarget);
+        const selectedFileTargets = selectedTargetIds(localFileTarget);
+        renderTargetPicker(localTarget, data.targets, selected);
+        renderTargetPicker(localFileTarget, data.targets, selectedFileTargets);
+        sendLocalTarget.disabled = !selectedTargetIds(localTarget).length;
+        sendLocalFiles.disabled = !selectedTargetIds(localFileTarget).length || !localFileInput.files.length;
       } catch (error) { sendLocalTarget.disabled = true; historyShow(error.message, true); }
     }
 
@@ -515,7 +564,7 @@ function localModeScript({ fileLimitLabel }) {
 
     async function refreshLocalFiles() {
       try {
-        const data = await apiJson('/api/v1/file-inbox');
+        const [data, outbox] = await Promise.all([apiJson('/api/v1/file-inbox'), apiJson('/api/v1/file-outbox')]);
         renderFileList(localFileList, data.transfers, {
           onOpen: (entry) => requestLocalFile(entry, true),
           onDownload: (entry) => requestLocalFile(entry, false),
@@ -524,6 +573,7 @@ function localModeScript({ fileLimitLabel }) {
             catch (error) { localFileShow(error.message, true); }
           }
         });
+        renderFileOutbox(localFileOutbox, outbox.transfers);
       } catch (error) { localFileList.textContent = error.message; }
     }
 
@@ -563,31 +613,37 @@ function localModeScript({ fileLimitLabel }) {
       catch (error) { historyShow(error.message, true); }
     });
     sendLocalTarget.addEventListener('click', async () => {
-      if (!localTarget.value) return;
+      const targetIds = selectedTargetIds(localTarget);
+      if (!targetIds.length) return;
       sendLocalTarget.disabled = true;
       try {
-        const data = await apiJson('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: localField.value, targetId: localTarget.value }) });
-        historyShow('已放入 ' + data.transfer.target.name + ' 的收件箱'); await refreshHistory();
+        const data = await apiJson('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: localField.value, targetIds }) });
+        historyShow(deliverySummary(data.deliveries)); await refreshHistory();
       } catch (error) { historyShow(error.message, true); }
-      finally { sendLocalTarget.disabled = !localTarget.value; }
+      finally { sendLocalTarget.disabled = !selectedTargetIds(localTarget).length; }
     });
+    localTarget.addEventListener('targetschange', () => { sendLocalTarget.disabled = !selectedTargetIds(localTarget).length; });
+    localFileTarget.addEventListener('targetschange', () => { sendLocalFiles.disabled = !selectedTargetIds(localFileTarget).length || !localFileInput.files.length; });
     localFileInput.addEventListener('change', () => {
       const files = [...localFileInput.files];
       localFileSummary.textContent = files.length ? files.length + ' 个文件 · ' + formatBytes(files.reduce((sum, file) => sum + file.size, 0)) : '单文件上限 ' + fileLimitLabel;
-      sendLocalFiles.disabled = !files.length || !localFileTarget.value;
+      sendLocalFiles.disabled = !files.length || !selectedTargetIds(localFileTarget).length;
     });
     sendLocalFiles.addEventListener('click', async () => {
       const selectedFiles = [...localFileInput.files];
-      if (!selectedFiles.length || !localFileTarget.value) return;
+      const targetIds = selectedTargetIds(localFileTarget);
+      if (!selectedFiles.length || !targetIds.length) return;
       sendLocalFiles.disabled = true; cancelLocalFiles.hidden = false; localFileProgress.hidden = false; localFileProgress.value = 0;
       try {
+        let latestDeliveries = [];
         for (const [index, file] of selectedFiles.entries()) {
           localFileShow('正在发送 ' + file.name + '…');
-          await uploadFile(file, localFileTarget.value, '', (fraction) => { localFileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { localUpload = xhr; });
+          const data = await uploadFile(file, targetIds, '', (fraction) => { localFileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { localUpload = xhr; });
+          latestDeliveries = data.deliveries;
         }
-        localFileProgress.value = 1; localFileShow('已发送 ' + selectedFiles.length + ' 个文件'); localFileInput.value = ''; localFileSummary.textContent = '单文件上限 ' + fileLimitLabel;
+        localFileProgress.value = 1; localFileShow('已发送 ' + selectedFiles.length + ' 个文件 · ' + deliverySummary(latestDeliveries)); localFileInput.value = ''; localFileSummary.textContent = '单文件上限 ' + fileLimitLabel; await refreshLocalFiles();
       } catch (error) { localFileShow(error.message, true); }
-      finally { localUpload = null; cancelLocalFiles.hidden = true; sendLocalFiles.disabled = !localFileInput.files.length || !localFileTarget.value; }
+      finally { localUpload = null; cancelLocalFiles.hidden = true; sendLocalFiles.disabled = !localFileInput.files.length || !selectedTargetIds(localFileTarget).length; }
     });
     cancelLocalFiles.addEventListener('click', () => localUpload?.abort());
     document.querySelector('#refresh-local-files').addEventListener('click', refreshLocalFiles);
@@ -650,6 +706,7 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
     const fileSummary = document.querySelector('#file-summary');
     const fileProgress = document.querySelector('#file-progress');
     const fileList = document.querySelector('#file-list');
+    const fileOutbox = document.querySelector('#file-outbox');
     const fileMessage = document.querySelector('#file-message');
     const sendFiles = document.querySelector('#send-files');
     const cancelFiles = document.querySelector('#cancel-files');
@@ -688,24 +745,22 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
       document.querySelector('#legacy-notice').hidden = !session.legacy;
       document.querySelector('#clear-inbox').disabled = session.legacy;
       fileMode.disabled = session.legacy;
-      refreshHistory(); loadPeers(); refreshInbox(); refreshFileInbox();
+      refreshHistory(); loadPeers(); refreshInbox(); refreshFileInbox(); refreshFileOutbox();
       clearInterval(inboxPoll);
-      if (!session.legacy) inboxPoll = setInterval(() => { refreshInbox(); refreshFileInbox(); }, 5000);
+      if (!session.legacy) inboxPoll = setInterval(() => { refreshInbox(); refreshFileInbox(); refreshFileOutbox(); }, 5000);
     }
 
     async function loadPeers() {
-      const windowsOption = document.createElement('option'); windowsOption.value = 'windows-host'; windowsOption.textContent = computerDisplayName;
-      sendTarget.replaceChildren(windowsOption);
-      fileTarget.replaceChildren(windowsOption.cloneNode(true));
-      if (currentSession?.legacy) return;
+      const fallbackTargets = [{ id: 'windows-host', name: computerDisplayName, type: 'windows' }];
+      renderTargetPicker(sendTarget, fallbackTargets, ['windows-host']);
+      renderTargetPicker(fileTarget, fallbackTargets, []);
+      if (currentSession?.legacy) { document.querySelector('#send-to-computer').disabled = false; return; }
       try {
         const data = await authenticated('/api/v1/peers');
-        sendTarget.replaceChildren();
-        fileTarget.replaceChildren();
-        for (const target of data.targets) {
-          const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; sendTarget.append(option);
-          fileTarget.append(option.cloneNode(true));
-        }
+        renderTargetPicker(sendTarget, data.targets, selectedTargetIds(sendTarget));
+        renderTargetPicker(fileTarget, data.targets, selectedTargetIds(fileTarget));
+        document.querySelector('#send-to-computer').disabled = !selectedTargetIds(sendTarget).length;
+        sendFiles.disabled = !selectedTargetIds(fileTarget).length || !fileInput.files.length;
       } catch (error) { remoteShow(error.message, true); }
     }
 
@@ -733,6 +788,14 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
           }
         });
       } catch (error) { fileList.textContent = error.message; }
+    }
+
+    async function refreshFileOutbox() {
+      if (!deviceToken || currentSession?.legacy) {
+        fileOutbox.replaceChildren(); const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '安全配对后可查看逐设备投递状态'; fileOutbox.append(empty); return;
+      }
+      try { renderFileOutbox(fileOutbox, (await authenticated('/api/v1/file-outbox')).transfers); }
+      catch (error) { fileOutbox.textContent = error.message; }
     }
 
     async function refreshInbox() {
@@ -827,19 +890,23 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
     fileMode.addEventListener('click', () => activateMode('file'));
 
     document.querySelector('#send-to-computer').addEventListener('click', async () => {
-      const button = document.querySelector('#send-to-computer'); button.disabled = true; remoteShow('正在发送…');
+      const button = document.querySelector('#send-to-computer'); const targetIds = selectedTargetIds(sendTarget);
+      if (!currentSession?.legacy && !targetIds.length) return;
+      button.disabled = true; remoteShow('正在发送…');
       try {
         if (currentSession?.legacy) {
           await authenticated('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value }) }); remoteShow('已发送到电脑剪贴板');
         } else {
-          const data = await authenticated('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value, targetId: sendTarget.value }) });
-          remoteShow(data.delivery === 'clipboard' ? '已发送到 Windows 剪贴板' : '已放入 ' + data.transfer.target.name + ' 的收件箱');
+          const data = await authenticated('/api/v1/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: document.querySelector('#send-text').value, targetIds }) });
+          remoteShow(deliverySummary(data.deliveries));
         }
         await refreshHistory();
       }
       catch (error) { remoteShow(error.message, true); }
-      finally { button.disabled = false; }
+      finally { button.disabled = !currentSession?.legacy && !selectedTargetIds(sendTarget).length; }
     });
+    sendTarget.addEventListener('targetschange', () => { document.querySelector('#send-to-computer').disabled = !currentSession?.legacy && !selectedTargetIds(sendTarget).length; });
+    fileTarget.addEventListener('targetschange', () => { sendFiles.disabled = !selectedTargetIds(fileTarget).length || !fileInput.files.length || currentSession?.legacy; });
     document.querySelector('#receive-from-computer').addEventListener('click', async () => {
       const button = document.querySelector('#receive-from-computer'); const copy = document.querySelector('#copy-to-device'); button.disabled = true; copy.disabled = true; remoteShow('正在获取电脑剪贴板…');
       try { document.querySelector('#received-text').value = (await authenticated('/api/v1/clip')).text; copy.disabled = false; remoteShow('已获取电脑的最新内容'); await refreshHistory(); }
@@ -852,23 +919,26 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
     fileInput.addEventListener('change', () => {
       const selectedFiles = [...fileInput.files];
       fileSummary.textContent = selectedFiles.length ? selectedFiles.length + ' 个文件 · ' + formatBytes(selectedFiles.reduce((sum, file) => sum + file.size, 0)) : '单文件上限 ' + fileLimitLabel;
-      sendFiles.disabled = !selectedFiles.length || !fileTarget.value || currentSession?.legacy;
+      sendFiles.disabled = !selectedFiles.length || !selectedTargetIds(fileTarget).length || currentSession?.legacy;
     });
     sendFiles.addEventListener('click', async () => {
       const selectedFiles = [...fileInput.files];
-      if (!selectedFiles.length || !fileTarget.value || currentSession?.legacy) return;
+      const targetIds = selectedTargetIds(fileTarget);
+      if (!selectedFiles.length || !targetIds.length || currentSession?.legacy) return;
       sendFiles.disabled = true; cancelFiles.hidden = false; fileProgress.hidden = false; fileProgress.value = 0;
       try {
+        let latestDeliveries = [];
         for (const [index, file] of selectedFiles.entries()) {
           fileShow('正在发送 ' + file.name + '…');
-          await uploadFile(file, fileTarget.value, deviceToken, (fraction) => { fileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { currentUpload = xhr; });
+          const data = await uploadFile(file, targetIds, deviceToken, (fraction) => { fileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { currentUpload = xhr; });
+          latestDeliveries = data.deliveries;
         }
-        fileProgress.value = 1; fileShow('已发送 ' + selectedFiles.length + ' 个文件'); fileInput.value = ''; fileSummary.textContent = '单文件上限 ' + fileLimitLabel;
+        fileProgress.value = 1; fileShow('已发送 ' + selectedFiles.length + ' 个文件 · ' + deliverySummary(latestDeliveries)); fileInput.value = ''; fileSummary.textContent = '单文件上限 ' + fileLimitLabel; await refreshFileOutbox();
       } catch (error) { fileShow(error.message, true); }
-      finally { currentUpload = null; cancelFiles.hidden = true; sendFiles.disabled = !fileInput.files.length || !fileTarget.value || currentSession?.legacy; }
+      finally { currentUpload = null; cancelFiles.hidden = true; sendFiles.disabled = !fileInput.files.length || !selectedTargetIds(fileTarget).length || currentSession?.legacy; }
     });
     cancelFiles.addEventListener('click', () => currentUpload?.abort());
-    document.querySelector('#refresh-files').addEventListener('click', refreshFileInbox);
+    document.querySelector('#refresh-files').addEventListener('click', () => { refreshFileInbox(); refreshFileOutbox(); });
     document.querySelector('#clear-files').addEventListener('click', async () => {
       if (currentSession?.legacy || !confirm('删除发给此设备的全部待接收文件？')) return;
       try { const data = await authenticated('/api/v1/file-inbox', { method: 'DELETE' }); fileShow('已清理 ' + data.removed + ' 个文件'); await refreshFileInbox(); }
