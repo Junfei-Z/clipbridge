@@ -224,13 +224,17 @@ GET /health
 - **0.2.1:** Local clipboard history with source and target devices, timestamps, a 50-entry limit, replay/copy, and scoped clear controls.
 - **0.3.0:** Local multi-device routing, named destinations, target-isolated inboxes, and a browser/PWA experience for Mac and mobile devices.
 - **0.4.0:** Streamed local file relay, device-scoped file inboxes, safe previews, single-use downloads, quotas, and automatic expiry.
-- Later: resumable chunk uploads, native Share extensions, a native Mac companion, and an end-to-end encrypted cross-network relay.
+- **0.5.0:** An installable public Web entry at `junfei-z.github.io/clipbridge/`, local-Hub connection guidance, and the foundation for browser-to-browser transport.
+- Later: one-to-many delivery, resumable chunk uploads, a native Mac companion, WebRTC direct transfer, native Share extensions, and an end-to-end encrypted cross-network relay.
 
 ## Development
 
 ```powershell
 npm install
 npm test
+npm run web:dev
 ```
+
+The public Web entry is served locally at `http://127.0.0.1:4173/clipbridge/`. Its deployment and privacy boundaries are documented in [docs/web-entry.md](docs/web-entry.md).
 
 ClipBridge is available under the MIT License.

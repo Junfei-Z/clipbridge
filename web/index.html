@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#6c46f2">
+  <meta name="description" content="ClipBridge 是一个本地优先的跨设备文字与文件传输工具。">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ClipBridge">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <title>ClipBridge · 跨设备轻松传</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="ClipBridge 首页">
+        <img src="./assets/icon-192.png" width="44" height="44" alt="">
+        <span>ClipBridge</span>
+      </a>
+      <div class="top-actions">
+        <span class="privacy-pill"><i></i>本地优先</span>
+        <a class="icon-link" href="https://github.com/Junfei-Z/clipbridge" target="_blank" rel="noreferrer" aria-label="查看 ClipBridge GitHub 仓库">GitHub</a>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">跨设备剪贴板与文件中转</p>
+        <h1 id="hero-title">把内容轻轻递到<br><span>另一台设备。</span></h1>
+        <p class="lede">从 iPhone、Android、Windows 到 Mac。先连接你身边的 ClipBridge Hub，文字和文件只在你选择的设备之间流转。</p>
+        <div class="trust-row" aria-label="ClipBridge 特点">
+          <span>无需注册</span>
+          <span>配对码不上传</span>
+          <span>适配手机桌面</span>
+        </div>
+      </div>
+
+      <section class="connect-card" aria-labelledby="connect-title">
+        <div class="device-summary">
+          <div class="device-icon" id="device-icon" aria-hidden="true">●</div>
+          <div>
+            <p>正在使用</p>
+            <h2 id="device-name">此设备</h2>
+          </div>
+          <span class="ready-state"><i></i>可以配对</span>
+        </div>
+
+        <div class="route-preview" aria-hidden="true">
+          <div class="route-device">
+            <span id="route-device-icon">●</span>
+            <strong id="route-device-name">此设备</strong>
+          </div>
+          <div class="route-line"><i></i><b></b><i></i></div>
+          <div class="route-device">
+            <span>▰</span>
+            <strong>你的 Hub</strong>
+          </div>
+        </div>
+
+        <form id="connect-form" novalidate autocomplete="off">
+          <label for="pairing-url">配对链接</label>
+          <div class="input-row">
+            <input id="pairing-url" name="pairing-url" type="url" inputmode="url" spellcheck="false" autocapitalize="none" autocomplete="off" placeholder="http://192.168.x.x:39393/ui?pair=…" aria-describedby="pairing-help pairing-message">
+            <button class="paste-button" id="paste-button" type="button">粘贴</button>
+          </div>
+          <p class="field-help" id="pairing-help">在 Windows 版 ClipBridge 中选择“配对新设备”，再复制或扫描它给出的链接。</p>
+          <p class="field-message" id="pairing-message" role="status" aria-live="polite"></p>
+          <button class="primary-button" type="submit">
+            <span>连接我的设备</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <div class="secure-note">
+          <span aria-hidden="true">⌁</span>
+          <p><strong>这个页面不会接收你的内容。</strong>配对链接仅用于打开本地 Hub，也不会保存在浏览器中。</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="mode-grid" aria-labelledby="modes-title">
+      <div class="section-intro">
+        <p class="eyebrow">连接方式</p>
+        <h2 id="modes-title">现在能用，未来更自由</h2>
+      </div>
+      <article class="mode-card active">
+        <div class="mode-top"><span class="mode-icon">⌂</span><span class="mode-badge">当前可用</span></div>
+        <h3>身边的 Hub</h3>
+        <p>Windows 作为局域网中转，适合在家、办公室或可信 Wi-Fi 下快速传输。</p>
+        <ul>
+          <li>文字与文件</li>
+          <li>真实设备配对</li>
+          <li>数据留在本地网络</li>
+        </ul>
+      </article>
+      <article class="mode-card upcoming">
+        <div class="mode-top"><span class="mode-icon">↗</span><span class="mode-badge">正在开发</span></div>
+        <h3>网页直连</h3>
+        <p>设备同时在线时通过加密点对点连接传输，不再要求 Windows 一直充当中心。</p>
+        <ul>
+          <li>WebRTC 加密通道</li>
+          <li>Windows 与 Mac 均可中转</li>
+          <li>一对多发送</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="install-card" id="install-card" aria-labelledby="install-title">
+      <img src="./assets/icon-192.png" width="72" height="72" alt="">
+      <div>
+        <p class="eyebrow">像原生应用一样打开</p>
+        <h2 id="install-title">把 ClipBridge 放到桌面</h2>
+        <p id="install-copy">安装后可以从桌面或主屏幕直接打开，Windows 与 iPhone 使用同一套图标和体验。</p>
+      </div>
+      <button class="secondary-button" id="install-button" type="button">查看安装方法</button>
+    </section>
+
+    <footer>
+      <div class="brand footer-brand">
+        <img src="./assets/icon-192.png" width="34" height="34" alt="">
+        <span>ClipBridge</span>
+      </div>
+      <p>Local-first by design · Preview release</p>
+    </footer>
+  </main>
+
+  <dialog id="install-dialog" aria-labelledby="install-dialog-title">
+    <div class="dialog-top">
+      <div>
+        <p class="eyebrow">安装到此设备</p>
+        <h2 id="install-dialog-title">添加 ClipBridge</h2>
+      </div>
+      <button class="close-button" type="button" aria-label="关闭">×</button>
+    </div>
+    <ol id="install-steps"></ol>
+    <button class="primary-button dialog-install" id="dialog-install-button" type="button" hidden>安装应用</button>
+  </dialog>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
