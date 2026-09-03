@@ -1,6 +1,6 @@
 {
   "name": "clipbridge",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "A lightweight, local-first text and file bridge with Windows or Mac relay nodes.",
   "type": "module",

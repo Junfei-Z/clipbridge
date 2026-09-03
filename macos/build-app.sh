@@ -13,4 +13,10 @@ cp "$PROJECT_ROOT/assets/brand-icon-96.png" "$CONTENTS/Resources/brand-icon-96.p
 command -v node > "$CONTENTS/Resources/node-path"
 chmod +x "$CONTENTS/MacOS/ClipBridge"
 
+# The app is compiled locally, so an ad-hoc signature gives the generated
+# bundle a consistent local identity without requiring an Apple Developer ID.
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force --deep --sign - "$APP_DIR" >/dev/null
+fi
+
 echo "$APP_DIR"

@@ -7,6 +7,12 @@ Version 0.5 allows either a Windows PC or a Mac to host the local ClipBridge rel
 - macOS 12 or later
 - Node.js 20 or later
 - Apple Command Line Tools (`xcode-select --install`)
+
+### Gatekeeper and downloaded source archives
+
+When the project came from a browser download, macOS may attach quarantine metadata to every extracted file. ClipBridge v0.5.1 runs the nested build script through the trusted system `/bin/bash` and ad-hoc signs the locally compiled app, so Gatekeeper does not evaluate `build-app.sh` as a separate application.
+
+You may still need to right-click `Start-ClipBridge-Mac.command` and choose **Open** the first time. ClipBridge deliberately does not remove quarantine metadata from the downloaded folder.
 - All participating devices on the same trusted private network
 
 ## Start
