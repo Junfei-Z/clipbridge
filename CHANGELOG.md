@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+### Added
+
+- A native macOS menu bar relay client built with AppKit and the existing ClipBridge mascot.
+- Native macOS clipboard support through `pbpaste` and `pbcopy`, preserving Unicode text exactly.
+- Stable relay-node identity fields and an authenticated `/api/v1/node` discovery endpoint.
+- Explicit `management-device` sessions and `relay-node` metadata, capabilities, platform, and access scope.
+- A one-command macOS launcher that builds the lightweight app bundle and records the selected Node.js executable.
+
+### Changed
+
+- The local and paired interfaces now describe the management device and relay node as separate roles.
+- Windows-specific clipboard and storage language is now relay-aware and renders correctly for Mac nodes.
+- Existing Windows configurations migrate automatically to schema v2 while preserving `windows-host` history and file compatibility.
+- The legacy `windows-host` target remains accepted as an alias for the active relay node.
+
 ## 0.4.1 - 2026-09-03
 
 ### Added

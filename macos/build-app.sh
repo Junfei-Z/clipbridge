@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="$PROJECT_ROOT/dist/ClipBridge.app"
+CONTENTS="$APP_DIR/Contents"
+
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+swiftc "$SCRIPT_DIR/ClipBridgeMenuBar.swift" -framework AppKit -o "$CONTENTS/MacOS/ClipBridge"
+cp "$SCRIPT_DIR/Info.plist" "$CONTENTS/Info.plist"
+cp "$PROJECT_ROOT/assets/brand-icon-96.png" "$CONTENTS/Resources/brand-icon-96.png"
+command -v node > "$CONTENTS/Resources/node-path"
+chmod +x "$CONTENTS/MacOS/ClipBridge"
+
+echo "$APP_DIR"

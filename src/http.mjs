@@ -5,13 +5,14 @@ import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
+import { isRelayTargetId, managementSession, relayNodeIdentity } from "./identity.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
 import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.4.1";
+const APP_VERSION = "0.5.0";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -72,7 +73,7 @@ function pairingUrls(addresses, port, code) {
 }
 
 function localIdentity(config) {
-  return { id: "windows-host", name: config.deviceName, type: "windows", kind: "computer" };
+  return relayNodeIdentity(config);
 }
 
 function legacyIdentity(clientDevice) {
@@ -92,11 +93,11 @@ function normalizeTargetIds(value) {
 }
 
 function resolveTargets(targetIds, { config, devices, identity }) {
-  const targets = targetIds.map((targetId) => targetId === "windows-host"
+  const targets = targetIds.map((targetId) => isRelayTargetId(targetId, config)
     ? transferEndpoint(localIdentity(config))
     : devices.get(targetId));
   if (targets.some((target) => !target || target.id === identity.id)) return null;
-  return targets.map(transferEndpoint);
+  return [...new Map(targets.map((target) => [target.id, transferEndpoint(target)])).values()];
 }
 
 function contentDisposition(name, disposition = "attachment") {
@@ -136,10 +137,13 @@ export function createClipBridgeServer({
     }
 
     if (requestUrl.pathname === "/health" && request.method === "GET") {
+      const relayNode = localIdentity(config);
       json(response, 200, {
         ok: true,
-        device: config.deviceName,
+        device: relayNode.name,
         version: APP_VERSION,
+        relayNode,
+        urls: pairingAddresses.map((address) => `http://${address}:${config.port}/ui`),
         ...(instanceId ? { instanceId } : {})
       });
       return;
@@ -203,6 +207,7 @@ export function createClipBridgeServer({
       });
       response.end(renderDashboard({
         deviceName: config.deviceName,
+        relayNode: localIdentity(config),
         isLocal,
         clientDevice,
         maxFileBytes: config.maxFileBytes,
@@ -263,7 +268,8 @@ export function createClipBridgeServer({
         json(response, 201, {
           token: registered.token,
           device: registered.device,
-          computer: localIdentity(config)
+          computer: localIdentity(config),
+          relayNode: localIdentity(config)
         });
         return;
       }
@@ -283,10 +289,22 @@ export function createClipBridgeServer({
       }
 
       if (requestUrl.pathname === "/api/v1/session" && request.method === "GET") {
+        const relayNode = localIdentity(config);
         json(response, 200, {
           device: identity,
-          computer: localIdentity(config),
+          computer: relayNode,
+          relayNode,
+          session: managementSession(identity, { isLocal, legacy: identity.kind === "legacy" }),
           legacy: identity.kind === "legacy"
+        });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/node" && request.method === "GET") {
+        json(response, 200, {
+          relayNode: localIdentity(config),
+          session: managementSession(identity, { isLocal, legacy: identity.kind === "legacy" }),
+          urls: pairingAddresses.map((address) => `http://${address}:${config.port}/ui`)
         });
         return;
       }
@@ -305,7 +323,7 @@ export function createClipBridgeServer({
 
       if (requestUrl.pathname === "/api/v1/pairing/sessions" && request.method === "POST") {
         if (!isLocal) {
-          json(response, 403, { error: "只能在 Windows 本机创建配对。" });
+          json(response, 403, { error: "只能在中转节点本机创建配对。" });
           return;
         }
         const session = pairing.create();
@@ -322,7 +340,7 @@ export function createClipBridgeServer({
 
       if (requestUrl.pathname === "/api/v1/devices" && request.method === "GET") {
         if (!isLocal) {
-          json(response, 403, { error: "只能在 Windows 本机管理设备。" });
+          json(response, 403, { error: "只能在中转节点本机管理设备。" });
           return;
         }
         json(response, 200, { devices: devices.list() });
@@ -332,7 +350,7 @@ export function createClipBridgeServer({
       const deviceRoute = requestUrl.pathname.match(/^\/api\/v1\/devices\/([^/]+)$/);
       if (deviceRoute && request.method === "DELETE") {
         if (!isLocal) {
-          json(response, 403, { error: "只能在 Windows 本机管理设备。" });
+          json(response, 403, { error: "只能在中转节点本机管理设备。" });
           return;
         }
         const removed = await devices.revoke(decodeURIComponent(deviceRoute[1]));
@@ -413,7 +431,7 @@ export function createClipBridgeServer({
         const source = transferEndpoint(identity);
         const deliveries = [];
         for (const target of targets) {
-          if (target.id === "windows-host") {
+          if (target.id === localIdentity(config).id) {
             await clipboard.writeText(body.text);
             const transfer = await history.add({ text: body.text, source, target });
             deliveries.push({ target, status: "delivered", delivery: "clipboard", transfer });
@@ -595,7 +613,7 @@ export function createClipBridgeServer({
           id: randomUUID(),
           kind: "text",
           text,
-          origin: config.deviceName,
+          origin: localIdentity(config).name,
           createdAt: new Date(now()).toISOString()
         });
         return;

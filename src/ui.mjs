@@ -1,5 +1,6 @@
 export function renderDashboard({
   deviceName,
+  relayNode,
   isLocal = false,
   clientDevice = { label: "此设备", type: "other" },
   legacyToken = "",
@@ -9,12 +10,21 @@ export function renderDashboard({
   const normalizedClient = typeof clientDevice === "string"
     ? { label: clientDevice, type: deviceTypeFromLabel(clientDevice) }
     : clientDevice;
+  const normalizedRelay = relayNode ?? {
+    id: "windows-host",
+    name: deviceName,
+    type: "windows",
+    platform: "win32",
+    role: "relay-node"
+  };
   const safeDeviceName = escapeHtml(deviceName);
   const fileLimitLabel = formatFileLimit(maxFileBytes);
-  const panel = isLocal ? renderLocalPanel(fileLimitLabel) : renderRemotePanel(safeDeviceName, normalizedClient, fileLimitLabel);
+  const panel = isLocal
+    ? renderLocalPanel(fileLimitLabel, normalizedRelay)
+    : renderRemotePanel(safeDeviceName, normalizedClient, fileLimitLabel, normalizedRelay);
   const modeScript = isLocal
-    ? localModeScript({ fileLimitLabel })
-    : remoteModeScript({ deviceName, clientDevice: normalizedClient, legacyToken, pairingCode, fileLimitLabel });
+    ? localModeScript({ fileLimitLabel, relayNode: normalizedRelay })
+    : remoteModeScript({ deviceName, relayNode: normalizedRelay, clientDevice: normalizedClient, legacyToken, pairingCode, fileLimitLabel });
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -127,6 +137,9 @@ export function renderDashboard({
     .empty { padding: 18px 8px; color: #8a93a6; text-align: center; font-size: 13px; }
     .notice { margin-bottom: 16px; padding: 11px 13px; color: #664f18; background: #fff7d8; border: 1px solid #f0df9c; border-radius: 13px; font-size: 12px; line-height: 1.5; }
     .warning { margin-top: 16px; color: #7a6840; background: #fff8df; border: 1px solid #f1df9e; border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+    .role-strip { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 14px; border: 1px solid #e8e4fb; border-radius: 15px; color: #657086; background: #faf8ff; font-size: 12px; }
+    .role-pill { padding: 5px 8px; border-radius: 999px; color: #4e2ad5; background: #eee8ff; font-weight: 750; }
+    .role-node { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
     @media (max-width: 560px) {
       body { align-items: start; padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom)); }
       header { align-items: flex-start; }
@@ -163,6 +176,8 @@ export function renderDashboard({
       .inbox-divider { background: #303744; }
       .danger { color: #ffb2b2; background: #442626; }
       .notice, .warning { color: #e7d99f; background: #302a18; border-color: #554a27; }
+      .role-strip { color: #c7cfdd; background: #23202f; border-color: #3b4050; }
+      .role-pill { color: #e1d8ff; background: #3b2d67; }
     }
   </style>
 </head>
@@ -170,7 +185,7 @@ export function renderDashboard({
   <main>
     <header>
       <div class="brand"><img class="brand-icon" src="/brand-icon-96.png" srcset="/brand-icon-96.png 96w, /brand-icon-192.png 192w" sizes="40px" width="40" height="40" alt=""><h1>ClipBridge</h1></div>
-      <span class="status"><i class="dot"></i><span id="connection-status">${isLocal ? "Windows 本机" : "等待配对"}</span></span>
+      <span class="status"><i class="dot"></i><span id="connection-status">${isLocal ? `管理端 · ${normalizedRelay.type === "mac" ? "Mac" : "Windows"} 中转` : "等待配对"}</span></span>
     </header>
     ${panel}
     <div class="warning">仅在可信私人网络中使用。当前局域网传输尚未加密，请勿传输密码、验证码或私钥。</div>
@@ -323,15 +338,18 @@ export function renderDashboard({
 </html>`;
 }
 
-function renderLocalPanel(fileLimitLabel) {
+function renderLocalPanel(fileLimitLabel, relayNode) {
+  const relayLabel = relayNode.type === "mac" ? "Mac" : relayNode.type === "windows" ? "Windows" : "设备";
+  const relayName = escapeHtml(relayNode.name);
   return `<div class="stack">
+    <section class="role-strip" aria-label="ClipBridge 角色"><span class="role-pill">管理设备</span><span aria-hidden="true">→</span><span class="role-node">${relayLabel} 中转节点 · ${relayName}</span></section>
     <section class="card" aria-labelledby="local-title">
       <div class="section-heading">
-        <div class="eyebrow">Windows 剪贴板</div>
-        <h2 id="local-title">本机剪贴板</h2>
-        <p class="helper">查看当前内容，修改后可以重新保存到 Windows 剪贴板。</p>
+        <div class="eyebrow">${relayLabel} 中转节点剪贴板</div>
+        <h2 id="local-title">节点剪贴板</h2>
+        <p class="helper">查看当前内容，修改后可以重新保存到 ${relayLabel} 剪贴板。</p>
       </div>
-      <textarea id="local-clip" aria-label="Windows 剪贴板内容" placeholder="正在读取 Windows 剪贴板…"></textarea>
+      <textarea id="local-clip" aria-label="中转节点剪贴板内容" placeholder="正在读取中转节点剪贴板…"></textarea>
       <div class="destination">
         <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="local-target" role="group" aria-label="文字接收设备"><div class="empty">正在读取设备…</div></div></div>
         <button class="primary" id="send-local-target" disabled><span class="button-icon" aria-hidden="true">→</span>发送给所选设备</button>
@@ -347,7 +365,7 @@ function renderLocalPanel(fileLimitLabel) {
         <div><div class="eyebrow">最近传输</div><h2 id="history-title">剪贴板历史</h2></div>
         <button class="quiet danger" id="clear-history">清空</button>
       </div>
-      <p class="helper">仅记录通过 ClipBridge 主动传输的文本，最多保留 50 条，并且只保存在这台 Windows 电脑上。</p>
+      <p class="helper">仅记录通过 ClipBridge 主动传输的文本，最多保留 50 条，并且只保存在当前中转节点上。</p>
       <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
       <div class="message" id="history-message" role="status" aria-live="polite"></div>
     </section>
@@ -366,7 +384,7 @@ function renderLocalPanel(fileLimitLabel) {
       <div class="row-heading inbox-heading"><div><div class="eyebrow">共享 Blob · 独立投递</div><h3>最近发送状态</h3></div></div>
       <div class="inbox-list" id="local-file-outbox"><div class="empty">正在读取发送状态…</div></div>
       <hr class="inbox-divider">
-      <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → Windows</div><h3>文件收件箱</h3></div><button class="quiet danger" id="clear-local-files">清空</button></div>
+      <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → 中转节点</div><h3>文件收件箱</h3></div><button class="quiet danger" id="clear-local-files">清空</button></div>
       <div class="inbox-list" id="local-file-list"><div class="empty">正在检查文件…</div></div>
     </section>
     <section class="card" aria-labelledby="devices-title">
@@ -390,14 +408,15 @@ function renderLocalPanel(fileLimitLabel) {
   </div>`;
 }
 
-function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
+function renderRemotePanel(deviceName, clientDevice, fileLimitLabel, relayNode) {
+  const relayLabel = relayNode.type === "mac" ? "Mac" : relayNode.type === "windows" ? "Windows" : "设备";
   const safeClientName = escapeHtml(clientDevice.label);
   return `<div class="stack">
     <section class="card" id="pair-panel" aria-labelledby="pair-title">
       <div class="section-heading">
         <div class="eyebrow">首次连接</div>
         <h2 id="pair-title">与 ${deviceName} 配对</h2>
-        <p class="helper">在 Windows 的 ClipBridge 中点击“配对新设备”，然后扫描二维码或输入 6 位配对码。</p>
+        <p class="helper">在 ${relayLabel} 中转节点的 ClipBridge 中点击“配对新设备”，然后扫描二维码或输入 6 位配对码。</p>
       </div>
       <form id="pair-form" class="form-grid">
         <label class="full">配对码<input class="code-input" id="pair-code-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="000000"></label>
@@ -408,16 +427,16 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
       <div class="message" id="message" role="status" aria-live="polite"></div>
     </section>
     <section class="card" id="remote-panel" aria-label="设备间剪贴板" hidden>
-      <div class="notice" id="legacy-notice" hidden>当前仍在使用 v0.1 的共享链接。建议在 Windows 端生成一次性配对码，升级为可单独撤销的设备身份。</div>
+      <div class="notice" id="legacy-notice" hidden>当前仍在使用 v0.1 的共享链接。建议在中转节点生成一次性配对码，升级为可单独撤销的设备身份。</div>
       <div class="pairing" aria-label="当前已配对连接">
         <div class="pair-device">
           <span class="device-badge" id="client-device-icon" aria-hidden="true">📱</span>
-          <span class="device-copy"><small>当前设备</small><strong id="client-device-name">${safeClientName}</strong></span>
+          <span class="device-copy"><small>管理设备</small><strong id="client-device-name">${safeClientName}</strong></span>
         </div>
         <div class="pair-route" aria-hidden="true"><span>已配对</span></div>
         <div class="pair-device">
-          <span class="device-copy"><small>Windows 电脑</small><strong id="computer-name">${deviceName}</strong></span>
-          <span class="device-badge" aria-hidden="true">💻</span>
+          <span class="device-copy"><small>${relayLabel} 中转节点</small><strong id="computer-name">${deviceName}</strong></span>
+          <span class="device-badge" id="relay-device-icon" aria-hidden="true">${relayNode.type === "mac" ? "⌘" : "💻"}</span>
         </div>
       </div>
       <div class="mode-tabs" role="tablist" aria-label="内容类型">
@@ -431,7 +450,7 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
         <button class="tab" id="history-tab" role="tab" aria-selected="false" aria-controls="history-panel" data-tab="history">历史</button>
       </div>
       <section id="send-panel" role="tabpanel" aria-labelledby="send-tab">
-        <div class="section-heading"><div class="eyebrow">一次选择一个或多个目标</div><h2>发送到所选设备</h2><p class="helper">发给 Windows 会立即写入剪贴板；其他设备会各自在自己的收件箱中收到。</p></div>
+        <div class="section-heading"><div class="eyebrow">一次选择一个或多个目标</div><h2>发送到所选设备</h2><p class="helper">发给中转节点会立即写入节点剪贴板；其他设备会各自在自己的收件箱中收到。</p></div>
         <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="send-target" role="group" aria-label="文字发送目标"><div class="empty">正在读取设备…</div></div></div>
         <textarea id="send-text" aria-label="要发送到电脑的内容" placeholder="在这里粘贴或输入…"></textarea>
         <div class="actions"><button class="primary" id="send-to-computer" disabled><span class="button-icon" aria-hidden="true">↑</span>发送</button></div>
@@ -455,12 +474,12 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
           <div><div class="eyebrow">这台设备的最近传输</div><h2>剪贴板历史</h2></div>
           <button class="quiet danger" id="clear-history">清空</button>
         </div>
-        <p class="helper">最多保留 50 条，仅显示与当前设备有关的记录；内容保存在 Windows 电脑上。</p>
+        <p class="helper">最多保留 50 条，仅显示与当前设备有关的记录；内容保存在中转节点上。</p>
         <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
       </section>
       </div>
       <section id="file-workspace" hidden>
-        <div class="section-heading"><div class="eyebrow">上传一次，共享给多台设备</div><h2>发送文件</h2><p class="helper">Windows 只保存一份文件 Blob，各接收设备拥有独立状态；默认 24 小时后自动清理。</p></div>
+        <div class="section-heading"><div class="eyebrow">上传一次，共享给多台设备</div><h2>发送文件</h2><p class="helper">中转节点只保存一份文件 Blob，各接收设备拥有独立状态；默认 24 小时后自动清理。</p></div>
         <div class="target-block"><div class="target-label">接收设备（可多选）</div><div class="target-picker" id="file-target" role="group" aria-label="文件发送目标"><div class="empty">正在读取设备…</div></div></div>
         <label class="file-picker">选择照片、视频、PDF、代码或其他文件<input id="file-input" type="file" multiple><span class="file-summary" id="file-summary">单文件上限 ${fileLimitLabel}</span></label>
         <progress id="file-progress" max="1" value="0" hidden></progress>
@@ -479,8 +498,10 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
   </div>`;
 }
 
-function localModeScript({ fileLimitLabel }) {
+function localModeScript({ fileLimitLabel, relayNode }) {
+  const relayLabel = relayNode.type === "mac" ? "Mac" : relayNode.type === "windows" ? "Windows" : "中转节点";
   return `const fileLimitLabel = ${safeScriptJson(fileLimitLabel)};
+    const relayLabel = ${safeScriptJson(relayLabel)};
     const localField = document.querySelector('#local-clip');
     const refreshButton = document.querySelector('#refresh-local');
     const saveButton = document.querySelector('#save-local');
@@ -512,8 +533,8 @@ function localModeScript({ fileLimitLabel }) {
     let localUpload = null;
 
     async function refreshLocalClipboard() {
-      refreshButton.disabled = true; show('正在读取 Windows 剪贴板…');
-      try { localField.value = (await apiJson('/api/v1/clip')).text; show('已读取当前 Windows 剪贴板'); }
+      refreshButton.disabled = true; show('正在读取' + relayLabel + '剪贴板…');
+      try { localField.value = (await apiJson('/api/v1/clip')).text; show('已读取当前中转节点剪贴板'); }
       catch (error) { show(error.message, true); }
       finally { refreshButton.disabled = false; }
     }
@@ -585,7 +606,7 @@ function localModeScript({ fileLimitLabel }) {
           onUse: async (entry) => {
             try {
               await apiJson('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: entry.text }) });
-              localField.value = entry.text; historyShow('已放回 Windows 剪贴板');
+              localField.value = entry.text; historyShow('已放回中转节点剪贴板');
             } catch (error) { historyShow(error.message, true); }
           },
           onDelete: async (entry) => {
@@ -602,13 +623,13 @@ function localModeScript({ fileLimitLabel }) {
 
     saveButton.addEventListener('click', async () => {
       saveButton.disabled = true; show('正在保存…');
-      try { await apiJson('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: localField.value }) }); show('已保存到 Windows 剪贴板'); }
+      try { await apiJson('/api/v1/clip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'text', text: localField.value }) }); show('已保存到' + relayLabel + '剪贴板'); }
       catch (error) { show(error.message, true); }
       finally { saveButton.disabled = false; }
     });
     refreshButton.addEventListener('click', refreshLocalClipboard);
     document.querySelector('#clear-history').addEventListener('click', async () => {
-      if (!confirm('清空这台 Windows 电脑上的全部剪贴板历史？')) return;
+      if (!confirm('清空当前中转节点上的全部剪贴板历史？')) return;
       try { const data = await apiJson('/api/v1/history', { method: 'DELETE' }); historyShow('已清空 ' + data.removed + ' 条记录'); await refreshHistory(); }
       catch (error) { historyShow(error.message, true); }
     });
@@ -648,7 +669,7 @@ function localModeScript({ fileLimitLabel }) {
     cancelLocalFiles.addEventListener('click', () => localUpload?.abort());
     document.querySelector('#refresh-local-files').addEventListener('click', refreshLocalFiles);
     document.querySelector('#clear-local-files').addEventListener('click', async () => {
-      if (!confirm('删除发给这台 Windows 的全部待接收文件？')) return;
+      if (!confirm('删除发给当前中转节点的全部待接收文件？')) return;
       try { const data = await apiJson('/api/v1/file-inbox', { method: 'DELETE' }); localFileShow('已清理 ' + data.removed + ' 个文件'); await refreshLocalFiles(); }
       catch (error) { localFileShow(error.message, true); }
     });
@@ -682,13 +703,14 @@ function localModeScript({ fileLimitLabel }) {
     refreshLocalClipboard(); refreshHistory(); refreshDevices(); refreshPeers(); refreshLocalFiles();`;
 }
 
-function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, fileLimitLabel }) {
+function remoteModeScript({ deviceName, relayNode, clientDevice, legacyToken, pairingCode, fileLimitLabel }) {
   return `const TOKEN_KEY = 'clipbridge.deviceToken.v2';
     const initialLegacyToken = ${safeScriptJson(legacyToken)};
     const initialPairingCode = ${safeScriptJson(pairingCode)};
     const guessedDevice = ${safeScriptJson(clientDevice)};
     const fileLimitLabel = ${safeScriptJson(fileLimitLabel)};
     const computerDisplayName = ${safeScriptJson(deviceName)};
+    const initialRelayNode = ${safeScriptJson({ id: relayNode.id, name: relayNode.name, type: relayNode.type })};
     const pairPanel = document.querySelector('#pair-panel');
     const remotePanel = document.querySelector('#remote-panel');
     const pairForm = document.querySelector('#pair-form');
@@ -741,7 +763,9 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
       document.querySelector('#connection-status').textContent = session.legacy ? '旧版连接' : '已安全配对';
       document.querySelector('#client-device-name').textContent = session.device.name;
       document.querySelector('#client-device-icon').textContent = deviceIcon(session.device.type);
-      document.querySelector('#computer-name').textContent = session.computer.name;
+      const connectedRelay = session.relayNode || session.computer || initialRelayNode;
+      document.querySelector('#computer-name').textContent = connectedRelay.name;
+      document.querySelector('#relay-device-icon').textContent = deviceIcon(connectedRelay.type);
       document.querySelector('#legacy-notice').hidden = !session.legacy;
       document.querySelector('#clear-inbox').disabled = session.legacy;
       fileMode.disabled = session.legacy;
@@ -751,8 +775,8 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, 
     }
 
     async function loadPeers() {
-      const fallbackTargets = [{ id: 'windows-host', name: computerDisplayName, type: 'windows' }];
-      renderTargetPicker(sendTarget, fallbackTargets, ['windows-host']);
+      const fallbackTargets = [initialRelayNode];
+      renderTargetPicker(sendTarget, fallbackTargets, [initialRelayNode.id]);
       renderTargetPicker(fileTarget, fallbackTargets, []);
       if (currentSession?.legacy) { document.querySelector('#send-to-computer').disabled = false; return; }
       try {

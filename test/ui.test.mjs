@@ -25,8 +25,10 @@ test("links high-resolution shared icons and a token-free manifest", () => {
 
 test("renders clipboard and device pairing management for Windows localhost", () => {
   const html = renderDashboard({ deviceName: "Test PC", isLocal: true });
-  assert.match(html, /Windows 本机/);
-  assert.match(html, /本机剪贴板/);
+  assert.match(html, /管理端 · Windows 中转/);
+  assert.match(html, /管理设备/);
+  assert.match(html, /Windows 中转节点 · Test PC/);
+  assert.match(html, /节点剪贴板/);
   assert.match(html, /重新读取/);
   assert.match(html, /保存到剪贴板/);
   assert.match(html, /id="local-target"/);
@@ -44,6 +46,26 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /已配对设备/);
   assert.match(html, /id="pair-qr"/);
   assert.doesNotMatch(html, /id="send-tab"/);
+});
+
+test("renders a Mac relay node separately from the management device", () => {
+  const html = renderDashboard({
+    deviceName: "Junfei MacBook",
+    relayNode: {
+      id: "relay-macbook",
+      name: "Junfei MacBook",
+      type: "mac",
+      platform: "darwin",
+      role: "relay-node"
+    },
+    isLocal: true
+  });
+
+  assert.match(html, /管理端 · Mac 中转/);
+  assert.match(html, /管理设备/);
+  assert.match(html, /Mac 中转节点 · Junfei MacBook/);
+  assert.match(html, /保存到 Mac 剪贴板/);
+  assert.match(html, /const relayLabel = "Mac"/);
 });
 
 test("renders a real pairing flow plus send and receive modes remotely", () => {
@@ -71,6 +93,8 @@ test("renders a real pairing flow plus send and receive modes remotely", () => {
   assert.match(html, /这台设备的最近传输/);
   assert.match(html, /复制文字/);
   assert.match(html, /取消此设备的配对/);
+  assert.match(html, /管理设备/);
+  assert.match(html, /Windows 中转节点/);
   assert.match(html, /const initialPairingCode = "123456"/);
   assert.doesNotMatch(html, /id="refresh-local"/);
 });

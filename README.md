@@ -6,17 +6,19 @@
 
 <p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
 
-ClipBridge transfers text and files between a Windows PC, iPhone, Android phone, Mac, and other devices on the same trusted private network. Version 0.4.1 can send one payload to several devices while storing only one copy of each file Blob, without requiring a cloud account or uploading content to a third-party service.
+ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. It requires no cloud account and does not upload content to a third-party service.
 
-## What works in 0.4.1
+## What works in 0.5
 
 - Pair an iPhone, iPad, Mac, Android device, or another computer with a one-time 6-digit code or local QR code.
 - Give every paired device an independent 256-bit access key.
 - Store only SHA-256 key hashes on Windows, never the usable device keys.
-- View paired device names and last-seen times from the Windows panel.
+- Run a lightweight native menu bar relay on macOS or a notification-area relay on Windows.
+- Keep the management-device role separate from the relay node, even when both roles run on one computer.
+- View paired device names and last-seen times from the relay node panel.
 - Revoke one device without breaking access for the others.
-- Send Unicode plain text to Windows and retrieve the current Windows clipboard.
-- Use a focused clipboard manager on Windows and direction-aware **Send** / **Receive** modes remotely.
+- Send Unicode plain text to a Windows or Mac relay and retrieve the current relay-node clipboard.
+- Use a focused clipboard manager on the relay node and direction-aware **Send** / **Receive** modes remotely.
 - Reuse, copy, delete, or clear the latest 50 explicit ClipBridge transfers from a device-scoped history.
 - Choose a named target such as Windows, iPhone, or Mac instead of always sending in one direction.
 - Select several named targets and send the same text or file to all of them in one action.
@@ -32,15 +34,15 @@ ClipBridge transfers text and files between a Windows PC, iPhone, Android phone,
 
 ## Security boundary
 
-Pairing and authorization are device-specific in 0.4.1, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
+Pairing and authorization are device-specific in 0.5, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
 
 Pairing codes expire after five minutes, work once, and rate-limit incorrect guesses. QR codes are generated locally; ClipBridge does not send pairing links or clipboard content to a QR service or other cloud service.
 
 ## Requirements
 
-- Windows 10 or later
+- Windows 10 or later, or macOS 12 or later
 - Node.js 20 or later
-- Windows and the other device connected to the same trusted Wi-Fi or private LAN
+- The relay node and other devices connected to the same trusted Wi-Fi or private LAN
 
 ## Start ClipBridge on Windows
 
@@ -68,32 +70,45 @@ npm start
 
 Windows Firewall may ask whether Node.js can accept connections. Allow it only on private networks.
 
+## Start ClipBridge on macOS
+
+Install dependencies once in Terminal, then double-click `Start-ClipBridge-Mac.command`:
+
+```bash
+npm install
+./Start-ClipBridge-Mac.command
+```
+
+The launcher uses Apple Command Line Tools to build a small native AppKit menu bar app in `dist/ClipBridge.app`. Its menu can open the management panel, copy the LAN device URL, or quit the Mac relay. Clipboard access uses the built-in `pbpaste` and `pbcopy` tools, so Unicode text does not pass through a legacy code page.
+
+See [the macOS relay guide](docs/macos-relay.md) for role definitions, requirements, and the hardware-validation boundary.
+
 ### Pair an iPhone or another device
 
-1. Open ClipBridge on the Windows PC.
+1. Open ClipBridge on the Windows or Mac relay node.
 2. Under **Paired devices**, choose **Pair new device**.
 3. Scan the local QR code with the iPhone camera, or open the copied device URL and enter the 6-digit code.
 4. Confirm the device name and type, then choose **Secure pair**.
 5. The device keeps its own access key in local browser storage. The key is not placed in the URL.
 
-From Windows you can later review the device and choose **Revoke**. The revoked device immediately loses clipboard access while every other paired device continues working.
+From the relay node you can later review the device and choose **Revoke**. The revoked device immediately loses clipboard access while every other paired device continues working.
 
 ### Send between iPhone, Mac, and Windows
 
-1. Pair each device with the same Windows ClipBridge service.
+1. Pair each device with the same Windows or Mac ClipBridge relay.
 2. Open **Send** and choose one or more named target devices.
-3. Sending to Windows writes immediately to the Windows clipboard.
-4. Sending to another paired device places the text in that device's private inbox on Windows.
+3. Sending to the relay node writes immediately to its Windows or Mac clipboard.
+4. Sending to another paired device places the text in that device's private inbox on the relay node.
 5. The target opens **Receive**, chooses **Copy and accept**, and the item leaves its inbox while remaining available in scoped history.
 
-The Windows hub must be running and every device must be on the same trusted private network. The target browser does not have to remain open while a text is queued.
+The relay node must be running and every device must be on the same trusted private network. The target browser does not have to remain open while a text is queued.
 
 ### Send a file from Android to iPhone through Windows
 
 1. Pair both the Android phone and iPhone with the same Windows ClipBridge service.
 2. On Android, open ClipBridge and switch from **Text** to **Files**.
 3. Choose the paired iPhone and any other intended recipients, select one or more files, and choose **Send files**.
-4. Windows stores one inert temporary Blob per file and creates an independent delivery record for every target; it does not open or execute the file.
+4. The relay node stores one inert temporary Blob per file and creates an independent delivery record for every target; it does not open or execute the file.
 5. On iPhone, open **Files**, then open, download, or delete the item from that device's private file inbox.
 
 The default limits are 256 MB per file, 1 GB of temporary file storage, and 24-hour retention. They can be changed in `.clipbridge/config.json`. iOS requires an explicit tap to download or save a received file; a local HTTP web app cannot silently write into Photos or Files.
@@ -108,16 +123,16 @@ ClipBridge shows an error dialog instead of leaving an empty command window. Dia
 
 ## Stored data
 
-ClipBridge keeps local settings in `.clipbridge/`:
+ClipBridge keeps local settings beside the relay in `.clipbridge/`:
 
-- `config.json` contains the port, Windows name, and the legacy v0.1 migration token.
+- `config.json` contains the port, stable relay-node identity/platform, and the legacy v0.1 migration token.
 - `devices.json` contains device metadata and key hashes. Usable per-device keys are never written there.
 - `history.json` contains up to 50 text transfers explicitly made through ClipBridge, including source, target, and timestamp.
 - `inbox.json` contains up to 50 pending texts per target device until that device accepts, ignores, or clears them.
 - `files.json` contains shared Blob metadata and separate per-target delivery states, including source, target, size, checksum, and expiry time.
 - `files/` contains opaque temporary file blobs. Original filenames are never used as disk paths.
 
-ClipBridge does not watch or index every Windows clipboard change. History stays on the Windows computer: its local panel can see all entries, while a paired device only receives entries in which that device is the source or target. Single entries and the visible history scope can be cleared from either interface.
+ClipBridge does not watch or index every relay clipboard change. History stays on the Windows or Mac relay node: its local management panel can see all entries, while a paired device only receives entries in which that device is the source or target. Single entries and the visible history scope can be cleared from either interface.
 
 ## Apple Shortcuts migration
 
@@ -163,6 +178,14 @@ Content-Type: application/json
 GET /api/v1/session
 ```
 
+The response separates the browser session from the host process: `session.role` is `management-device`, while `relayNode.role` is `relay-node`. Relay metadata can also be read with:
+
+```http
+GET /api/v1/node
+```
+
+Loopback management sessions have owner access and can create or revoke pairings. Paired remote management devices remain scoped to their own transfers.
+
 ### List or clear clipboard history
 
 ```http
@@ -180,8 +203,10 @@ GET /api/v1/peers
 POST /api/v1/transfers
 Content-Type: application/json
 
-{"kind":"text","text":"Hello everyone","targetIds":["windows-host","<iphone-id>","<mac-id>"]}
+{"kind":"text","text":"Hello everyone","targetIds":["<relay-node-id>","<iphone-id>","<mac-id>"]}
 ```
+
+The v0.4 `windows-host` target remains a compatibility alias for whichever relay node is currently active.
 
 ### Read or clear the current device inbox
 
@@ -233,7 +258,7 @@ GET /health
 - **0.3.0:** Local multi-device routing, named destinations, target-isolated inboxes, and a browser/PWA experience for Mac and mobile devices.
 - **0.4.0:** Streamed local file relay, device-scoped file inboxes, safe previews, single-use downloads, quotas, and automatic expiry.
 - **0.4.1:** One-to-many text/file sending, shared Blobs, and independent per-recipient delivery status.
-- **0.5:** Native Mac relay client with explicit management-device and relay-node roles.
+- **0.5:** Native Mac relay client with explicit management-device and relay-node roles. Implemented; Mac hardware acceptance pending.
 - **0.6:** HTTPS public web entry, installable PWA, and WebRTC online direct transfer.
 - **0.7:** End-to-end encrypted offline relay.
 - **0.8:** Agent Handoff Beta using GitHub project state plus portable Markdown/JSON handoff packages.
