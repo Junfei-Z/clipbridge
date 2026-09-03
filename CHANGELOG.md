@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 - Unreleased
+## 0.4.0 - 2026-09-03
 
 ### Added
 
@@ -17,6 +17,11 @@
 - Unknown files always download as inert attachments; SVG, HTML, scripts, and source code preview as plain text and are never injected into the ClipBridge page.
 - A paired device can only list, preview, download, or delete files addressed to its own identity.
 - Revoking either the source or target device removes its queued file transfers.
+
+### Verified
+
+- Automated Windows test suite and GitHub Actions passed.
+- Real-device text and file transfer acceptance passed on the local-network workflow.
 
 ## 0.3.0 - 2026-09-02
 
