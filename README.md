@@ -6,9 +6,9 @@
 
 <p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
 
-ClipBridge transfers text and files between a Windows PC, iPhone, Android phone, Mac, and other devices on the same trusted private network. Version 0.4 adds a private file inbox to the Windows-hosted multi-device hub, without requiring a cloud account or uploading content to a third-party service.
+ClipBridge transfers text and files between a Windows PC, iPhone, Android phone, Mac, and other devices on the same trusted private network. Version 0.4.1 can send one payload to several devices while storing only one copy of each file Blob, without requiring a cloud account or uploading content to a third-party service.
 
-## What works in 0.4
+## What works in 0.4.1
 
 - Pair an iPhone, iPad, Mac, Android device, or another computer with a one-time 6-digit code or local QR code.
 - Give every paired device an independent 256-bit access key.
@@ -19,18 +19,20 @@ ClipBridge transfers text and files between a Windows PC, iPhone, Android phone,
 - Use a focused clipboard manager on Windows and direction-aware **Send** / **Receive** modes remotely.
 - Reuse, copy, delete, or clear the latest 50 explicit ClipBridge transfers from a device-scoped history.
 - Choose a named target such as Windows, iPhone, or Mac instead of always sending in one direction.
+- Select several named targets and send the same text or file to all of them in one action.
 - Queue up to 50 pending texts per paired device in an isolated Windows-hosted inbox.
 - Send photos, videos, PDFs, SVGs, source code, archives, and other files to a named paired device.
 - Stream file uploads directly to Windows disk with progress and cancellation instead of buffering a whole video in memory.
 - Open safe previews for common images, videos, PDFs, and plain-text code; SVG and HTML are shown as inert text rather than executed.
 - Download through short-lived, single-use links that never place the device access key in the URL.
 - Automatically remove temporary files after 24 hours, when the target deletes them, or when either paired device is revoked.
+- Store one shared Blob for a multi-recipient file and track each recipient as pending or downloaded independently.
 - Keep the same high-resolution ClipBridge mascot in the tray, browser, and iPhone Home Screen.
 - Continue opening v0.1 shared-token links during migration.
 
 ## Security boundary
 
-Pairing and authorization are device-specific in 0.4, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
+Pairing and authorization are device-specific in 0.4.1, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
 
 Pairing codes expire after five minutes, work once, and rate-limit incorrect guesses. QR codes are generated locally; ClipBridge does not send pairing links or clipboard content to a QR service or other cloud service.
 
@@ -79,7 +81,7 @@ From Windows you can later review the device and choose **Revoke**. The revoked 
 ### Send between iPhone, Mac, and Windows
 
 1. Pair each device with the same Windows ClipBridge service.
-2. Open **Send** and choose a named target device.
+2. Open **Send** and choose one or more named target devices.
 3. Sending to Windows writes immediately to the Windows clipboard.
 4. Sending to another paired device places the text in that device's private inbox on Windows.
 5. The target opens **Receive**, chooses **Copy and accept**, and the item leaves its inbox while remaining available in scoped history.
@@ -90,8 +92,8 @@ The Windows hub must be running and every device must be on the same trusted pri
 
 1. Pair both the Android phone and iPhone with the same Windows ClipBridge service.
 2. On Android, open ClipBridge and switch from **Text** to **Files**.
-3. Choose the paired iPhone as the target, select one or more files, and choose **Send files**.
-4. Windows stores the upload as an inert temporary blob; it does not open or execute the file.
+3. Choose the paired iPhone and any other intended recipients, select one or more files, and choose **Send files**.
+4. Windows stores one inert temporary Blob per file and creates an independent delivery record for every target; it does not open or execute the file.
 5. On iPhone, open **Files**, then open, download, or delete the item from that device's private file inbox.
 
 The default limits are 256 MB per file, 1 GB of temporary file storage, and 24-hour retention. They can be changed in `.clipbridge/config.json`. iOS requires an explicit tap to download or save a received file; a local HTTP web app cannot silently write into Photos or Files.
@@ -112,7 +114,7 @@ ClipBridge keeps local settings in `.clipbridge/`:
 - `devices.json` contains device metadata and key hashes. Usable per-device keys are never written there.
 - `history.json` contains up to 50 text transfers explicitly made through ClipBridge, including source, target, and timestamp.
 - `inbox.json` contains up to 50 pending texts per target device until that device accepts, ignores, or clears them.
-- `files.json` contains file metadata such as source, target, size, checksum, and expiry time.
+- `files.json` contains shared Blob metadata and separate per-target delivery states, including source, target, size, checksum, and expiry time.
 - `files/` contains opaque temporary file blobs. Original filenames are never used as disk paths.
 
 ClipBridge does not watch or index every Windows clipboard change. History stays on the Windows computer: its local panel can see all entries, while a paired device only receives entries in which that device is the source or target. Single entries and the visible history scope can be cleared from either interface.
@@ -178,7 +180,7 @@ GET /api/v1/peers
 POST /api/v1/transfers
 Content-Type: application/json
 
-{"kind":"text","text":"Hello Mac","targetId":"<paired-device-id>"}
+{"kind":"text","text":"Hello everyone","targetIds":["windows-host","<iphone-id>","<mac-id>"]}
 ```
 
 ### Read or clear the current device inbox
@@ -193,10 +195,10 @@ Inbox endpoints are target-scoped: one paired device cannot inspect or consume a
 
 ### Send and receive files
 
-Upload a raw file body with the target and display name in the query string:
+Upload a raw file body with one or more repeated `targetId` values and the display name in the query string. The body is stored once even when several targets are selected:
 
 ```http
-POST /api/v1/file-transfers?targetId=<paired-device-id>&name=photo.jpg
+POST /api/v1/file-transfers?targetId=<iphone-id>&targetId=<mac-id>&name=photo.jpg
 Content-Type: image/jpeg
 
 <raw file bytes>
@@ -208,6 +210,12 @@ The target lists and clears only its own file inbox:
 GET /api/v1/file-inbox
 DELETE /api/v1/file-inbox
 DELETE /api/v1/file-transfers/<file-id>
+```
+
+The sender can inspect independent delivery state for its recent shared Blobs:
+
+```http
+GET /api/v1/file-outbox
 ```
 
 `POST /api/v1/file-transfers/<file-id>/download` creates a 60-second, single-use download URL. The URL contains no device key. Add `?inline=1` to request a safe browser preview when that file type supports it.
@@ -224,7 +232,11 @@ GET /health
 - **0.2.1:** Local clipboard history with source and target devices, timestamps, a 50-entry limit, replay/copy, and scoped clear controls.
 - **0.3.0:** Local multi-device routing, named destinations, target-isolated inboxes, and a browser/PWA experience for Mac and mobile devices.
 - **0.4.0:** Streamed local file relay, device-scoped file inboxes, safe previews, single-use downloads, quotas, and automatic expiry.
-- Later: resumable chunk uploads, native Share extensions, a native Mac companion, and an end-to-end encrypted cross-network relay.
+- **0.4.1:** One-to-many text/file sending, shared Blobs, and independent per-recipient delivery status.
+- **0.5:** Native Mac relay client with explicit management-device and relay-node roles.
+- **0.6:** HTTPS public web entry, installable PWA, and WebRTC online direct transfer.
+- **0.7:** End-to-end encrypted offline relay.
+- **0.8:** Agent Handoff Beta using GitHub project state plus portable Markdown/JSON handoff packages.
 
 ## Development
 

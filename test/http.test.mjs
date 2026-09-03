@@ -230,6 +230,39 @@ test("routes text between paired devices through isolated local inboxes", async 
   });
 });
 
+test("sends one text payload to Windows and multiple paired-device inboxes", async () => {
+  await withServer(async (baseUrl, currentValue, { devices }) => {
+    const android = await devices.register({ name: "Android 手机", type: "android" });
+    const iphone = await devices.register({ name: "Junfei 的 iPhone", type: "iphone" });
+    const mac = await devices.register({ name: "Junfei 的 MacBook", type: "mac" });
+    const androidAuth = { Authorization: `Bearer ${android.token}` };
+
+    const response = await fetch(`${baseUrl}/api/v1/transfers`, {
+      method: "POST",
+      headers: { ...androidAuth, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "text",
+        text: "同时发送给三台设备",
+        targetIds: ["windows-host", iphone.device.id, mac.device.id]
+      })
+    });
+    assert.equal(response.status, 201);
+    const batch = await response.json();
+    assert.equal(batch.deliveries.length, 3);
+    assert.deepEqual(batch.deliveries.map(({ status }) => status), ["delivered", "queued", "queued"]);
+    assert.equal(currentValue(), "同时发送给三台设备");
+
+    const iphoneInbox = await (await fetch(`${baseUrl}/api/v1/inbox`, {
+      headers: { Authorization: `Bearer ${iphone.token}` }
+    })).json();
+    const macInbox = await (await fetch(`${baseUrl}/api/v1/inbox`, {
+      headers: { Authorization: `Bearer ${mac.token}` }
+    })).json();
+    assert.equal(iphoneInbox.transfers[0].text, "同时发送给三台设备");
+    assert.equal(macInbox.transfers[0].text, "同时发送给三台设备");
+  });
+});
+
 test("relays files between paired devices with isolated one-time downloads", async () => {
   await withServer(async (baseUrl, _currentValue, { devices }) => {
     const android = await devices.register({ name: "Android 手机", type: "android" });
@@ -269,6 +302,51 @@ test("relays files between paired devices with isolated one-time downloads", asy
     assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}`, { method: "DELETE", headers: androidAuth })).status, 404);
     assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${uploaded.transfer.id}`, { method: "DELETE", headers: iphoneAuth })).status, 200);
     assert.deepEqual((await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: iphoneAuth })).json()).transfers, []);
+  });
+});
+
+test("uploads one shared file blob with independent delivery status per target", async () => {
+  await withServer(async (baseUrl, _currentValue, { devices, files }) => {
+    const android = await devices.register({ name: "Android 手机", type: "android" });
+    const iphone = await devices.register({ name: "Junfei 的 iPhone", type: "iphone" });
+    const mac = await devices.register({ name: "Junfei 的 MacBook", type: "mac" });
+    const androidAuth = { Authorization: `Bearer ${android.token}` };
+    const iphoneAuth = { Authorization: `Bearer ${iphone.token}` };
+    const macAuth = { Authorization: `Bearer ${mac.token}` };
+    const content = Buffer.from("shared across devices", "utf8");
+
+    const query = new URLSearchParams({ name: "shared.txt" });
+    query.append("targetId", iphone.device.id);
+    query.append("targetId", mac.device.id);
+    const upload = await fetch(`${baseUrl}/api/v1/file-transfers?${query}`, {
+      method: "POST",
+      headers: { ...androidAuth, "Content-Type": "text/plain" },
+      body: content
+    });
+    assert.equal(upload.status, 201);
+    const batch = await upload.json();
+    assert.equal(batch.deliveries.length, 2);
+    assert.equal(batch.deliveries[0].transfer.blobId, batch.blobId);
+    assert.equal(batch.deliveries[1].transfer.blobId, batch.blobId);
+
+    const iphoneEntry = (await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: iphoneAuth })).json()).transfers[0];
+    const macEntry = (await (await fetch(`${baseUrl}/api/v1/file-inbox`, { headers: macAuth })).json()).transfers[0];
+    assert.notEqual(iphoneEntry.id, macEntry.id);
+    assert.equal(iphoneEntry.blobId, macEntry.blobId);
+
+    const ticket = await (await fetch(`${baseUrl}/api/v1/file-transfers/${iphoneEntry.id}/download`, {
+      method: "POST",
+      headers: iphoneAuth
+    })).json();
+    assert.deepEqual(Buffer.from(await (await fetch(`${baseUrl}${ticket.url}`)).arrayBuffer()), content);
+
+    const outbox = await (await fetch(`${baseUrl}/api/v1/file-outbox`, { headers: androidAuth })).json();
+    assert.deepEqual(outbox.transfers[0].deliveries.map(({ status }) => status), ["downloaded", "pending"]);
+
+    assert.equal((await fetch(`${baseUrl}/api/v1/file-transfers/${iphoneEntry.id}`, { method: "DELETE", headers: iphoneAuth })).status, 200);
+    assert.equal(files.list(mac.device.id).length, 1);
+    const macTicket = await (await fetch(`${baseUrl}/api/v1/file-transfers/${macEntry.id}/download`, { method: "POST", headers: macAuth })).json();
+    assert.deepEqual(Buffer.from(await (await fetch(`${baseUrl}${macTicket.url}`)).arrayBuffer()), content);
   });
 });
 
@@ -321,7 +399,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.4.0 and the runtime instance on the health endpoint", async () => {
+test("reports v0.4.1 and the runtime instance on the health endpoint", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -334,7 +412,7 @@ test("reports v0.4.0 and the runtime instance on the health endpoint", async () 
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.4.0",
+      version: "0.4.1",
       instanceId: "tray-launch-123"
     });
   } finally {
