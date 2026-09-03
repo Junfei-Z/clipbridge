@@ -1,18 +1,21 @@
 import { loadConfig } from "./config.mjs";
-import { readClipboardText, writeClipboardText } from "./clipboard-windows.mjs";
+import { createClipboardAdapter, supportsRelayPlatform } from "./clipboard.mjs";
 import { createClipBridgeServer } from "./http.mjs";
 import { localIPv4Addresses } from "./network.mjs";
 import { loadDeviceRegistry } from "./devices.mjs";
 import { loadHistoryStore } from "./history.mjs";
 import { loadInboxStore } from "./inbox.mjs";
 import { loadFileTransferStore } from "./files.mjs";
+import { relayNodeIdentity, relayPlatformLabel } from "./identity.mjs";
 
-if (process.platform !== "win32") {
-  console.error("The ClipBridge hub currently runs on Windows only.");
+if (!supportsRelayPlatform(process.platform)) {
+  console.error(`ClipBridge relay nodes currently support Windows and macOS, not ${process.platform}.`);
   process.exit(1);
 }
 
 const config = await loadConfig();
+const relayNode = relayNodeIdentity(config);
+const clipboard = createClipboardAdapter(process.platform);
 const addresses = localIPv4Addresses();
 const devices = await loadDeviceRegistry(config.stateDir);
 const history = await loadHistoryStore(config.stateDir);
@@ -34,16 +37,13 @@ const server = createClipBridgeServer({
   inbox,
   files,
   pairingAddresses: addresses,
-  clipboard: {
-    readText: readClipboardText,
-    writeText: writeClipboardText
-  }
+  clipboard
 });
 
 server.listen(config.port, "0.0.0.0", () => {
-  console.log(`ClipBridge is running as ${config.deviceName}.`);
+  console.log(`ClipBridge is running as ${relayNode.name} (${relayPlatformLabel(relayNode)} relay node).`);
   console.log("Use only on a trusted private network. This prototype does not encrypt HTTP traffic.");
-  if (process.env.CLIPBRIDGE_LAUNCH_MODE !== "tray") {
+  if (!['tray', 'menubar'].includes(process.env.CLIPBRIDGE_LAUNCH_MODE)) {
     console.log("");
     for (const address of addresses) {
       console.log(`Pairing base URL: http://${address}:${config.port}`);

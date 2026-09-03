@@ -101,6 +101,10 @@ test("completes one-time device pairing and supports individual revocation", asy
     assert.equal(identity.device.id, paired.device.id);
     assert.equal(identity.device.kind, "paired");
     assert.equal(identity.computer.name, "Test PC");
+    assert.equal(identity.relayNode.role, "relay-node");
+    assert.equal(identity.session.role, "management-device");
+    assert.equal(identity.session.access, "paired");
+    assert.equal(identity.session.canManagePairing, false);
 
     const clipResponse = await fetch(`${baseUrl}/api/v1/clip`, {
       method: "POST",
@@ -367,7 +371,7 @@ test("keeps v0.1 bearer links working during migration", async () => {
   });
 });
 
-test("serves the Windows device manager locally and the pairing screen remotely", async () => {
+test("serves relay-node management locally and the pairing screen remotely", async () => {
   await withServer(async (baseUrl) => {
     const remote = await fetch(`${baseUrl}/ui`, { headers: { "User-Agent": "Mozilla/5.0 (iPhone)" } });
     assert.equal(remote.status, 200);
@@ -376,7 +380,9 @@ test("serves the Windows device manager locally and the pairing screen remotely"
     const local = await fetch(`${baseUrl}/ui`, { headers: LOCAL_HEADERS });
     assert.equal(local.status, 200);
     const html = await local.text();
-    assert.match(html, /Windows 本机/);
+    assert.match(html, /管理端 · Windows 中转/);
+    assert.match(html, /管理设备/);
+    assert.match(html, /Windows 中转节点/);
     assert.match(html, /配对新设备/);
     assert.match(html, /已配对设备/);
     assert.doesNotMatch(html, /id="pair-form"/);
@@ -399,7 +405,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.4.1 and the runtime instance on the health endpoint", async () => {
+test("reports v0.5.0, relay identity, URLs, and the runtime instance on health", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -412,9 +418,69 @@ test("reports v0.4.1 and the runtime instance on the health endpoint", async () 
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.4.1",
+      version: "0.5.0",
+      relayNode: {
+        id: "windows-host",
+        name: "Test PC",
+        type: "windows",
+        platform: "win32",
+        role: "relay-node",
+        kind: "relay",
+        capabilities: ["clipboard", "files", "pairing"]
+      },
+      urls: [],
       instanceId: "tray-launch-123"
     });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("uses a Mac relay node as a first-class transfer target and accepts the legacy alias", async () => {
+  let value = "from Mac";
+  const now = () => Date.parse("2026-09-03T12:00:00Z");
+  const devices = new DeviceRegistry({ now });
+  const iphone = await devices.register({ name: "Junfei iPhone", type: "iphone" });
+  const server = createClipBridgeServer({
+    config: {
+      token: LEGACY_TOKEN,
+      deviceName: "Junfei MacBook",
+      nodeId: "relay-macbook",
+      nodeName: "Junfei MacBook",
+      nodePlatform: "darwin",
+      nodeType: "mac",
+      maxTextBytes: 1024,
+      port: 39393
+    },
+    clipboard: {
+      readText: async () => value,
+      writeText: async (next) => { value = next; }
+    },
+    devices,
+    pairingAddresses: ["192.168.1.88"],
+    isLocalRequest: () => false,
+    now
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address();
+    const auth = { Authorization: `Bearer ${iphone.token}` };
+    const peers = await (await fetch(`http://127.0.0.1:${port}/api/v1/peers`, { headers: auth })).json();
+    assert.deepEqual(peers.targets[0], { id: "relay-macbook", name: "Junfei MacBook", type: "mac" });
+
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/transfers`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "text", text: "发到 Mac", targetId: "windows-host" })
+    });
+    assert.equal(response.status, 201);
+    assert.equal(value, "发到 Mac");
+    assert.equal((await response.json()).deliveries[0].target.id, "relay-macbook");
+
+    const session = await (await fetch(`http://127.0.0.1:${port}/api/v1/node`, { headers: auth })).json();
+    assert.equal(session.relayNode.type, "mac");
+    assert.equal(session.session.role, "management-device");
+    assert.deepEqual(session.urls, ["http://192.168.1.88:39393/ui"]);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

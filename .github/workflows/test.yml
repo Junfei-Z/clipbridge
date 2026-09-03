@@ -9,7 +9,11 @@ permissions:
 
 jobs:
   node-test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,3 +22,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Build native Mac menu bar app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          npm run build:mac
+          plutil -lint dist/ClipBridge.app/Contents/Info.plist
+          test -x dist/ClipBridge.app/Contents/MacOS/ClipBridge
+          test -s dist/ClipBridge.app/Contents/Resources/node-path
