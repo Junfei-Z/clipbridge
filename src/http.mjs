@@ -1,7 +1,9 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
+import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
+import { FileTransferStore, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -9,7 +11,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.4.0";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -81,6 +83,11 @@ function transferEndpoint(identity) {
   return { id: identity.id, name: identity.name, type: identity.type };
 }
 
+function contentDisposition(name, disposition = "attachment") {
+  const fallback = name.replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/["\\]/g, "_").slice(0, 120) || "download";
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
 export function createClipBridgeServer({
   config,
   clipboard,
@@ -89,10 +96,18 @@ export function createClipBridgeServer({
   devices = new DeviceRegistry({ now }),
   history = new HistoryStore({ now }),
   inbox = new InboxStore({ now }),
+  files = new FileTransferStore({
+    stateDir: config.stateDir ?? path.join(process.cwd(), ".clipbridge"),
+    maxFileBytes: config.maxFileBytes ?? 256 * 1024 * 1024,
+    maxTotalBytes: config.maxFileTotalBytes ?? 1024 * 1024 * 1024,
+    ttlMs: config.fileTtlMs ?? 24 * 60 * 60 * 1000,
+    now
+  }),
   pairing = new PairingManager({ now }),
   pairingAddresses = [],
   isLocalRequest = (address) => isLoopbackAddress(address)
 }) {
+  const downloadTickets = new Map();
   return http.createServer(async (request, response) => {
     const requestUrl = new URL(request.url, "http://localhost");
     const remoteAddress = request.socket.remoteAddress ?? "";
@@ -141,7 +156,7 @@ export function createClipBridgeServer({
       const manifest = {
         name: "ClipBridge",
         short_name: "ClipBridge",
-        description: "A lightweight clipboard bridge between iPhone and Windows.",
+        description: "A lightweight local text and file bridge for your devices.",
         start_url: "/ui",
         scope: "/",
         display: "standalone",
@@ -174,9 +189,41 @@ export function createClipBridgeServer({
         deviceName: config.deviceName,
         isLocal,
         clientDevice,
+        maxFileBytes: config.maxFileBytes,
         legacyToken: requestUrl.searchParams.get("token") ?? "",
         pairingCode: requestUrl.searchParams.get("pair") ?? ""
       }));
+      return;
+    }
+
+    const downloadRoute = requestUrl.pathname.match(/^\/api\/v1\/file-downloads\/([^/]+)$/);
+    if (downloadRoute && request.method === "GET") {
+      const ticketId = decodeURIComponent(downloadRoute[1]);
+      const ticket = downloadTickets.get(ticketId);
+      downloadTickets.delete(ticketId);
+      if (!ticket || ticket.expiresAt <= now()) {
+        json(response, 404, { error: "下载链接已失效，请重新点击下载。" });
+        return;
+      }
+      const entry = files.get(ticket.entryId, ticket.targetId);
+      if (!entry) {
+        json(response, 404, { error: "文件不存在或已经过期。" });
+        return;
+      }
+      const presentation = filePresentation(entry.name);
+      const inline = ticket.inline && presentation.previewKind;
+      response.writeHead(200, {
+        "Content-Type": inline ? presentation.contentType : "application/octet-stream",
+        "Content-Length": entry.bytes,
+        "Content-Disposition": contentDisposition(entry.name, inline ? "inline" : "attachment"),
+        "Cache-Control": "private, no-store",
+        "Content-Security-Policy": "sandbox; default-src 'none'",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff"
+      });
+      const stream = files.createReadStream(entry.id);
+      stream.on("error", () => response.destroy());
+      stream.pipe(response);
       return;
     }
 
@@ -225,6 +272,7 @@ export function createClipBridgeServer({
         }
         await devices.revoke(identity.id);
         await inbox.clear(identity.id);
+        await files.removeForDevice(identity.id);
         json(response, 200, { ok: true });
         return;
       }
@@ -267,6 +315,7 @@ export function createClipBridgeServer({
           return;
         }
         await inbox.clear(decodeURIComponent(deviceRoute[1]));
+        await files.removeForDevice(decodeURIComponent(deviceRoute[1]));
         json(response, 200, { ok: true });
         return;
       }
@@ -349,6 +398,95 @@ export function createClipBridgeServer({
           delivery = "inbox";
         }
         json(response, 201, { transfer, delivery });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/file-transfers" && request.method === "POST") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "文件传输需要使用安全设备配对。", code: "SECURE_PAIRING_REQUIRED" });
+          return;
+        }
+        const targetId = requestUrl.searchParams.get("targetId") ?? "";
+        const name = requestUrl.searchParams.get("name") ?? "";
+        const target = targetId === "windows-host"
+          ? transferEndpoint(localIdentity(config))
+          : devices.get(targetId);
+        if (!target || target.id === identity.id) {
+          json(response, 404, { error: "没有找到可接收的目标设备。" });
+          return;
+        }
+        const contentLengthHeader = request.headers["content-length"];
+        const declaredBytes = contentLengthHeader === undefined ? null : Number(contentLengthHeader);
+        const transfer = await files.receive({
+          stream: request,
+          name,
+          mimeType: request.headers["content-type"] ?? "",
+          declaredBytes,
+          source: transferEndpoint(identity),
+          target: transferEndpoint(target)
+        });
+        json(response, 201, { transfer, delivery: "file-inbox" });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/file-inbox" && request.method === "GET") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才有文件收件箱。" });
+          return;
+        }
+        await files.cleanupExpired();
+        json(response, 200, { transfers: files.list(identity.id) });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/file-inbox" && request.method === "DELETE") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才有文件收件箱。" });
+          return;
+        }
+        const removed = await files.clear(identity.id);
+        json(response, 200, { ok: true, removed });
+        return;
+      }
+
+      const fileRoute = requestUrl.pathname.match(/^\/api\/v1\/file-transfers\/([^/]+)$/);
+      if (fileRoute && request.method === "DELETE") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才可以删除文件。" });
+          return;
+        }
+        const removed = await files.remove(decodeURIComponent(fileRoute[1]), identity.id);
+        if (!removed) {
+          json(response, 404, { error: "没有找到这个文件。" });
+          return;
+        }
+        json(response, 200, { ok: true });
+        return;
+      }
+
+      const fileDownloadRoute = requestUrl.pathname.match(/^\/api\/v1\/file-transfers\/([^/]+)\/download$/);
+      if (fileDownloadRoute && request.method === "POST") {
+        if (!isLocal && identity.kind !== "paired") {
+          json(response, 403, { error: "只有已安全配对的设备才可以下载文件。" });
+          return;
+        }
+        const entry = files.get(decodeURIComponent(fileDownloadRoute[1]), identity.id);
+        if (!entry) {
+          json(response, 404, { error: "文件不存在或已经过期。" });
+          return;
+        }
+        const ticket = randomUUID();
+        for (const [id, issued] of downloadTickets) {
+          if (issued.expiresAt <= now()) downloadTickets.delete(id);
+        }
+        while (downloadTickets.size >= 1000) downloadTickets.delete(downloadTickets.keys().next().value);
+        downloadTickets.set(ticket, {
+          entryId: entry.id,
+          targetId: identity.id,
+          inline: requestUrl.searchParams.get("inline") === "1",
+          expiresAt: now() + 60_000
+        });
+        json(response, 201, { url: `/api/v1/file-downloads/${ticket}`, expiresIn: 60 });
         return;
       }
 

@@ -5,9 +5,10 @@ import { localIPv4Addresses } from "./network.mjs";
 import { loadDeviceRegistry } from "./devices.mjs";
 import { loadHistoryStore } from "./history.mjs";
 import { loadInboxStore } from "./inbox.mjs";
+import { loadFileTransferStore } from "./files.mjs";
 
 if (process.platform !== "win32") {
-  console.error("ClipBridge 0.2 currently runs on Windows only.");
+  console.error("The ClipBridge hub currently runs on Windows only.");
   process.exit(1);
 }
 
@@ -16,12 +17,22 @@ const addresses = localIPv4Addresses();
 const devices = await loadDeviceRegistry(config.stateDir);
 const history = await loadHistoryStore(config.stateDir);
 const inbox = await loadInboxStore(config.stateDir);
+const files = await loadFileTransferStore(config.stateDir, {
+  maxFileBytes: config.maxFileBytes,
+  maxTotalBytes: config.maxFileTotalBytes,
+  ttlMs: config.fileTtlMs
+});
+const fileCleanupTimer = setInterval(() => {
+  files.cleanupExpired().catch(() => {});
+}, 60 * 60 * 1000);
+fileCleanupTimer.unref();
 const server = createClipBridgeServer({
   config,
   instanceId: process.env.CLIPBRIDGE_INSTANCE_ID || null,
   devices,
   history,
   inbox,
+  files,
   pairingAddresses: addresses,
   clipboard: {
     readText: readClipboardText,
@@ -44,6 +55,7 @@ server.listen(config.port, "0.0.0.0", () => {
 });
 
 function stop() {
+  clearInterval(fileCleanupTimer);
   server.close(() => process.exit(0));
 }
 

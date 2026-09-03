@@ -3,16 +3,18 @@ export function renderDashboard({
   isLocal = false,
   clientDevice = { label: "此设备", type: "other" },
   legacyToken = "",
-  pairingCode = ""
+  pairingCode = "",
+  maxFileBytes = 256 * 1024 * 1024
 }) {
   const normalizedClient = typeof clientDevice === "string"
     ? { label: clientDevice, type: deviceTypeFromLabel(clientDevice) }
     : clientDevice;
   const safeDeviceName = escapeHtml(deviceName);
-  const panel = isLocal ? renderLocalPanel() : renderRemotePanel(safeDeviceName, normalizedClient);
+  const fileLimitLabel = formatFileLimit(maxFileBytes);
+  const panel = isLocal ? renderLocalPanel(fileLimitLabel) : renderRemotePanel(safeDeviceName, normalizedClient, fileLimitLabel);
   const modeScript = isLocal
-    ? localModeScript()
-    : remoteModeScript({ deviceName, clientDevice: normalizedClient, legacyToken, pairingCode });
+    ? localModeScript({ fileLimitLabel })
+    : remoteModeScript({ deviceName, clientDevice: normalizedClient, legacyToken, pairingCode, fileLimitLabel });
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -81,6 +83,9 @@ export function renderDashboard({
     .pair-route { display: flex; align-items: center; gap: 5px; color: #20a767; font-size: 11px; white-space: nowrap; }
     .pair-route::before, .pair-route::after { content: ""; width: 12px; height: 1px; background: #8bd5af; }
     .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 22px; padding: 4px; border-radius: 15px; background: #eef0f5; }
+    .mode-tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 18px; }
+    .mode-tab { color: #657086; background: #f4f2fb; border: 1px solid #e8e4fb; }
+    .mode-tab[aria-selected="true"] { color: #fff; background: linear-gradient(135deg, #7546f5, #4d35e8); box-shadow: 0 7px 16px #5f35f229; }
     .tab { padding: 10px 14px; color: #657086; background: transparent; box-shadow: none; }
     .tab[aria-selected="true"] { color: #4224b8; background: #fff; box-shadow: 0 3px 10px #26334d14; }
     .message { min-height: 22px; margin: 13px 2px 0; color: #657086; font-size: 13px; }
@@ -103,6 +108,12 @@ export function renderDashboard({
     .history-actions { display: flex; justify-content: flex-end; gap: 5px; margin-top: 8px; }
     .inbox-heading { margin-top: 4px; }
     .inbox-list { display: grid; gap: 9px; }
+    .file-picker { display: grid; gap: 9px; margin-top: 14px; padding: 18px; border: 1px dashed #b8aaf1; border-radius: 16px; background: #faf8ff; text-align: center; }
+    .file-picker input { padding: 9px; background: #fff; }
+    .file-summary { min-height: 20px; color: #7b8497; font-size: 13px; }
+    progress { width: 100%; height: 9px; margin-top: 12px; accent-color: #5f35f2; }
+    .file-name { margin: 8px 0 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 720; }
+    .file-detail { margin-top: 5px; color: #7b8497; font-size: 12px; }
     .inbox-divider { height: 1px; margin: 22px 0; border: 0; background: #eceef3; }
     .empty { padding: 18px 8px; color: #8a93a6; text-align: center; font-size: 13px; }
     .notice { margin-bottom: 16px; padding: 11px 13px; color: #664f18; background: #fff7d8; border: 1px solid #f0df9c; border-radius: 13px; font-size: 12px; line-height: 1.5; }
@@ -132,6 +143,7 @@ export function renderDashboard({
       textarea, input, select { color: inherit; background: #151920; border-color: #303744; }
       textarea[readonly] { color: #d8ddea; }
       .secondary, .tabs { background: #303744; color: #eef1f7; }
+      .mode-tab, .file-picker { color: #d8ddea; background: #222631; border-color: #3b4050; }
       .tab { color: #aeb7c8; }
       .tab[aria-selected="true"] { color: #fff; background: #5f35f2; box-shadow: none; }
       .pairing, .pair-box { border-color: #3b4050; background: linear-gradient(135deg, #23202f, #1d2731); }
@@ -204,13 +216,62 @@ export function renderDashboard({
       }
     }
 
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+      return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    }
+
+    function renderFileList(container, entries, { onOpen, onDownload, onDelete }) {
+      container.replaceChildren();
+      if (!entries.length) {
+        const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '暂时没有待接收文件'; container.append(empty); return;
+      }
+      for (const entry of entries) {
+        const item = document.createElement('article'); item.className = 'history-item';
+        const top = document.createElement('div'); top.className = 'history-top';
+        const route = document.createElement('div'); route.className = 'history-route'; route.textContent = entry.source.name + ' → ' + entry.target.name;
+        const time = document.createElement('time'); time.className = 'history-meta'; time.textContent = new Date(entry.createdAt).toLocaleString();
+        const name = document.createElement('p'); name.className = 'file-name'; name.textContent = entry.name;
+        const detail = document.createElement('div'); detail.className = 'file-detail'; detail.textContent = formatBytes(entry.bytes) + ' · ' + new Date(entry.expiresAt).toLocaleString() + ' 前有效';
+        const actions = document.createElement('div'); actions.className = 'history-actions';
+        if (entry.previewKind) {
+          const open = document.createElement('button'); open.className = 'quiet'; open.textContent = entry.previewKind === 'text' ? '安全预览' : '打开'; open.addEventListener('click', () => onOpen(entry)); actions.append(open);
+        }
+        const download = document.createElement('button'); download.className = 'quiet'; download.textContent = '下载'; download.addEventListener('click', () => onDownload(entry));
+        const remove = document.createElement('button'); remove.className = 'quiet danger'; remove.textContent = '删除'; remove.addEventListener('click', () => onDelete(entry));
+        top.append(route, time); actions.append(download, remove); item.append(top, name, detail, actions); container.append(item);
+      }
+    }
+
+    function uploadFile(file, targetId, token, onProgress, onStart = () => {}) {
+      return new Promise((resolve, reject) => {
+        const query = new URLSearchParams({ targetId, name: file.name });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/v1/file-transfers?' + query);
+        if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(event.loaded / event.total); };
+        onStart(xhr);
+        xhr.onload = () => {
+          let data = {}; try { data = JSON.parse(xhr.responseText || '{}'); } catch {}
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || '文件上传失败'));
+        };
+        xhr.onerror = () => reject(new Error('网络中断，文件没有上传完成'));
+        xhr.onabort = () => reject(new Error('上传已取消'));
+        xhr.send(file);
+      });
+    }
+
     ${modeScript}
   </script>
 </body>
 </html>`;
 }
 
-function renderLocalPanel() {
+function renderLocalPanel(fileLimitLabel) {
   return `<div class="stack">
     <section class="card" aria-labelledby="local-title">
       <div class="section-heading">
@@ -238,6 +299,21 @@ function renderLocalPanel() {
       <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
       <div class="message" id="history-message" role="status" aria-live="polite"></div>
     </section>
+    <section class="card" aria-labelledby="local-files-title">
+      <div class="row-heading">
+        <div><div class="eyebrow">局域网文件中转</div><h2 id="local-files-title">文件</h2></div>
+        <button class="quiet" id="refresh-local-files">刷新收件箱</button>
+      </div>
+      <p class="helper">把文件发送给已配对设备，或接收发给这台 Windows 的文件。文件默认在本机保留 24 小时。</p>
+      <label>目标设备<select id="local-file-target" aria-label="文件目标设备"><option value="">正在读取设备…</option></select></label>
+      <label class="file-picker">选择一个或多个文件<input id="local-file-input" type="file" multiple><span class="file-summary" id="local-file-summary">单文件上限 ${fileLimitLabel}</span></label>
+      <progress id="local-file-progress" max="1" value="0" hidden></progress>
+      <div class="actions"><button class="primary" id="send-local-files" disabled>发送文件</button><button class="secondary" id="cancel-local-files" hidden>取消上传</button></div>
+      <div class="message" id="local-file-message" role="status" aria-live="polite"></div>
+      <hr class="inbox-divider">
+      <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → Windows</div><h3>文件收件箱</h3></div><button class="quiet danger" id="clear-local-files">清空</button></div>
+      <div class="inbox-list" id="local-file-list"><div class="empty">正在检查文件…</div></div>
+    </section>
     <section class="card" aria-labelledby="devices-title">
       <div class="row-heading">
         <div><div class="eyebrow">安全连接</div><h2 id="devices-title">已配对设备</h2></div>
@@ -259,7 +335,7 @@ function renderLocalPanel() {
   </div>`;
 }
 
-function renderRemotePanel(deviceName, clientDevice) {
+function renderRemotePanel(deviceName, clientDevice, fileLimitLabel) {
   const safeClientName = escapeHtml(clientDevice.label);
   return `<div class="stack">
     <section class="card" id="pair-panel" aria-labelledby="pair-title">
@@ -289,6 +365,11 @@ function renderRemotePanel(deviceName, clientDevice) {
           <span class="device-badge" aria-hidden="true">💻</span>
         </div>
       </div>
+      <div class="mode-tabs" role="tablist" aria-label="内容类型">
+        <button class="mode-tab" id="text-mode" role="tab" aria-controls="clipboard-workspace" aria-selected="true">文字</button>
+        <button class="mode-tab" id="file-mode" role="tab" aria-controls="file-workspace" aria-selected="false">文件</button>
+      </div>
+      <div id="clipboard-workspace">
       <div class="tabs" role="tablist" aria-label="传输方向">
         <button class="tab" id="send-tab" role="tab" aria-selected="true" aria-controls="send-panel" data-tab="send">发送</button>
         <button class="tab" id="receive-tab" role="tab" aria-selected="false" aria-controls="receive-panel" data-tab="receive">接收</button>
@@ -322,14 +403,27 @@ function renderRemotePanel(deviceName, clientDevice) {
         <p class="helper">最多保留 50 条，仅显示与当前设备有关的记录；内容保存在 Windows 电脑上。</p>
         <div class="history-list" id="history-list"><div class="empty">正在读取历史…</div></div>
       </section>
+      </div>
+      <section id="file-workspace" hidden>
+        <div class="section-heading"><div class="eyebrow">通过 Windows 临时中转</div><h2>发送文件</h2><p class="helper">文件只保存在这台 Windows 上，默认 24 小时后自动清理。</p></div>
+        <label>目标设备<select id="file-target" aria-label="文件发送目标"><option value="windows-host">${deviceName}</option></select></label>
+        <label class="file-picker">选择照片、视频、PDF、代码或其他文件<input id="file-input" type="file" multiple><span class="file-summary" id="file-summary">单文件上限 ${fileLimitLabel}</span></label>
+        <progress id="file-progress" max="1" value="0" hidden></progress>
+        <div class="actions"><button class="primary" id="send-files" disabled>发送文件</button><button class="secondary" id="cancel-files" hidden>取消上传</button><button class="secondary" id="refresh-files">刷新收件箱</button></div>
+        <div class="message" id="file-message" role="status" aria-live="polite"></div>
+        <hr class="inbox-divider">
+        <div class="row-heading inbox-heading"><div><div class="eyebrow">其他设备 → 此设备</div><h2>文件收件箱</h2></div><button class="quiet danger" id="clear-files">清空</button></div>
+        <div class="inbox-list" id="file-list"><div class="empty">正在检查文件…</div></div>
+      </section>
       <div class="message" id="remote-message" role="status" aria-live="polite"></div>
       <div class="actions"><button class="quiet danger" id="forget-device">取消此设备的配对</button></div>
     </section>
   </div>`;
 }
 
-function localModeScript() {
-  return `const localField = document.querySelector('#local-clip');
+function localModeScript({ fileLimitLabel }) {
+  return `const fileLimitLabel = ${safeScriptJson(fileLimitLabel)};
+    const localField = document.querySelector('#local-clip');
     const refreshButton = document.querySelector('#refresh-local');
     const saveButton = document.querySelector('#save-local');
     const localTarget = document.querySelector('#local-target');
@@ -344,9 +438,19 @@ function localModeScript() {
     const deviceList = document.querySelector('#device-list');
     const historyList = document.querySelector('#history-list');
     const historyMessage = document.querySelector('#history-message');
+    const localFileTarget = document.querySelector('#local-file-target');
+    const localFileInput = document.querySelector('#local-file-input');
+    const localFileSummary = document.querySelector('#local-file-summary');
+    const localFileProgress = document.querySelector('#local-file-progress');
+    const localFileList = document.querySelector('#local-file-list');
+    const localFileMessage = document.querySelector('#local-file-message');
+    const sendLocalFiles = document.querySelector('#send-local-files');
+    const cancelLocalFiles = document.querySelector('#cancel-local-files');
     const historyShow = (text, error = false) => { historyMessage.textContent = text; historyMessage.style.color = error ? '#d14343' : ''; };
+    const localFileShow = (text, error = false) => { localFileMessage.textContent = text; localFileMessage.style.color = error ? '#d14343' : ''; };
     let currentPairUrl = '';
     let pairingPoll = null;
+    let localUpload = null;
 
     async function refreshLocalClipboard() {
       refreshButton.disabled = true; show('正在读取 Windows 剪贴板…');
@@ -383,16 +487,44 @@ function localModeScript() {
       try {
         const data = await apiJson('/api/v1/peers');
         const selected = localTarget.value;
+        const selectedFileTarget = localFileTarget.value;
         localTarget.replaceChildren();
+        localFileTarget.replaceChildren();
         for (const target of data.targets) {
           const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; localTarget.append(option);
+          const fileOption = option.cloneNode(true); localFileTarget.append(fileOption);
         }
         if (data.targets.some((target) => target.id === selected)) localTarget.value = selected;
+        if (data.targets.some((target) => target.id === selectedFileTarget)) localFileTarget.value = selectedFileTarget;
         if (!data.targets.length) {
           const option = document.createElement('option'); option.value = ''; option.textContent = '还没有其他已配对设备'; localTarget.append(option);
+          localFileTarget.append(option.cloneNode(true));
         }
         sendLocalTarget.disabled = !data.targets.length;
+        sendLocalFiles.disabled = !data.targets.length || !localFileInput.files.length;
       } catch (error) { sendLocalTarget.disabled = true; historyShow(error.message, true); }
+    }
+
+    async function requestLocalFile(entry, inline) {
+      const tab = inline ? window.open('', '_blank') : null;
+      try {
+        const data = await apiJson('/api/v1/file-transfers/' + encodeURIComponent(entry.id) + '/download' + (inline ? '?inline=1' : ''), { method: 'POST' });
+        if (tab) tab.location.href = data.url; else window.location.assign(data.url);
+      } catch (error) { if (tab) tab.close(); localFileShow(error.message, true); }
+    }
+
+    async function refreshLocalFiles() {
+      try {
+        const data = await apiJson('/api/v1/file-inbox');
+        renderFileList(localFileList, data.transfers, {
+          onOpen: (entry) => requestLocalFile(entry, true),
+          onDownload: (entry) => requestLocalFile(entry, false),
+          onDelete: async (entry) => {
+            try { await apiJson('/api/v1/file-transfers/' + encodeURIComponent(entry.id), { method: 'DELETE' }); await refreshLocalFiles(); }
+            catch (error) { localFileShow(error.message, true); }
+          }
+        });
+      } catch (error) { localFileList.textContent = error.message; }
     }
 
     async function refreshHistory() {
@@ -439,6 +571,31 @@ function localModeScript() {
       } catch (error) { historyShow(error.message, true); }
       finally { sendLocalTarget.disabled = !localTarget.value; }
     });
+    localFileInput.addEventListener('change', () => {
+      const files = [...localFileInput.files];
+      localFileSummary.textContent = files.length ? files.length + ' 个文件 · ' + formatBytes(files.reduce((sum, file) => sum + file.size, 0)) : '单文件上限 ' + fileLimitLabel;
+      sendLocalFiles.disabled = !files.length || !localFileTarget.value;
+    });
+    sendLocalFiles.addEventListener('click', async () => {
+      const selectedFiles = [...localFileInput.files];
+      if (!selectedFiles.length || !localFileTarget.value) return;
+      sendLocalFiles.disabled = true; cancelLocalFiles.hidden = false; localFileProgress.hidden = false; localFileProgress.value = 0;
+      try {
+        for (const [index, file] of selectedFiles.entries()) {
+          localFileShow('正在发送 ' + file.name + '…');
+          await uploadFile(file, localFileTarget.value, '', (fraction) => { localFileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { localUpload = xhr; });
+        }
+        localFileProgress.value = 1; localFileShow('已发送 ' + selectedFiles.length + ' 个文件'); localFileInput.value = ''; localFileSummary.textContent = '单文件上限 ' + fileLimitLabel;
+      } catch (error) { localFileShow(error.message, true); }
+      finally { localUpload = null; cancelLocalFiles.hidden = true; sendLocalFiles.disabled = !localFileInput.files.length || !localFileTarget.value; }
+    });
+    cancelLocalFiles.addEventListener('click', () => localUpload?.abort());
+    document.querySelector('#refresh-local-files').addEventListener('click', refreshLocalFiles);
+    document.querySelector('#clear-local-files').addEventListener('click', async () => {
+      if (!confirm('删除发给这台 Windows 的全部待接收文件？')) return;
+      try { const data = await apiJson('/api/v1/file-inbox', { method: 'DELETE' }); localFileShow('已清理 ' + data.removed + ' 个文件'); await refreshLocalFiles(); }
+      catch (error) { localFileShow(error.message, true); }
+    });
     pairButton.addEventListener('click', async () => {
       pairButton.disabled = true;
       try {
@@ -466,14 +623,15 @@ function localModeScript() {
       if (!currentPairUrl) return;
       show(await copyText(currentPairUrl) ? '配对链接已复制' : '请手动复制配对链接', false);
     });
-    refreshLocalClipboard(); refreshHistory(); refreshDevices(); refreshPeers();`;
+    refreshLocalClipboard(); refreshHistory(); refreshDevices(); refreshPeers(); refreshLocalFiles();`;
 }
 
-function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }) {
+function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode, fileLimitLabel }) {
   return `const TOKEN_KEY = 'clipbridge.deviceToken.v2';
     const initialLegacyToken = ${safeScriptJson(legacyToken)};
     const initialPairingCode = ${safeScriptJson(pairingCode)};
     const guessedDevice = ${safeScriptJson(clientDevice)};
+    const fileLimitLabel = ${safeScriptJson(fileLimitLabel)};
     const computerDisplayName = ${safeScriptJson(deviceName)};
     const pairPanel = document.querySelector('#pair-panel');
     const remotePanel = document.querySelector('#remote-panel');
@@ -483,9 +641,22 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     const sendTarget = document.querySelector('#send-target');
     const inboxList = document.querySelector('#inbox-list');
     const receiveTab = document.querySelector('#receive-tab');
+    const clipboardWorkspace = document.querySelector('#clipboard-workspace');
+    const fileWorkspace = document.querySelector('#file-workspace');
+    const textMode = document.querySelector('#text-mode');
+    const fileMode = document.querySelector('#file-mode');
+    const fileTarget = document.querySelector('#file-target');
+    const fileInput = document.querySelector('#file-input');
+    const fileSummary = document.querySelector('#file-summary');
+    const fileProgress = document.querySelector('#file-progress');
+    const fileList = document.querySelector('#file-list');
+    const fileMessage = document.querySelector('#file-message');
+    const sendFiles = document.querySelector('#send-files');
+    const cancelFiles = document.querySelector('#cancel-files');
     let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
     let currentSession = null;
     let inboxPoll = null;
+    let currentUpload = null;
 
     if (initialLegacyToken) {
       deviceToken = initialLegacyToken; localStorage.setItem(TOKEN_KEY, deviceToken);
@@ -495,6 +666,7 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
 
     function authHeaders(extra = {}) { return deviceToken ? { ...extra, Authorization: 'Bearer ' + deviceToken } : extra; }
     function remoteShow(text, error = false) { remoteMessage.textContent = text; remoteMessage.style.color = error ? '#d14343' : ''; }
+    function fileShow(text, error = false) { fileMessage.textContent = text; fileMessage.style.color = error ? '#d14343' : ''; }
     function deviceIcon(type) { return ({ iphone: '📱', ipad: '▣', android: '🤖', mac: '⌘', windows: '💻' })[type] || '◆'; }
 
     async function authenticated(path, options = {}) {
@@ -515,22 +687,52 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
       document.querySelector('#computer-name').textContent = session.computer.name;
       document.querySelector('#legacy-notice').hidden = !session.legacy;
       document.querySelector('#clear-inbox').disabled = session.legacy;
-      refreshHistory(); loadPeers(); refreshInbox();
+      fileMode.disabled = session.legacy;
+      refreshHistory(); loadPeers(); refreshInbox(); refreshFileInbox();
       clearInterval(inboxPoll);
-      if (!session.legacy) inboxPoll = setInterval(refreshInbox, 5000);
+      if (!session.legacy) inboxPoll = setInterval(() => { refreshInbox(); refreshFileInbox(); }, 5000);
     }
 
     async function loadPeers() {
       const windowsOption = document.createElement('option'); windowsOption.value = 'windows-host'; windowsOption.textContent = computerDisplayName;
       sendTarget.replaceChildren(windowsOption);
+      fileTarget.replaceChildren(windowsOption.cloneNode(true));
       if (currentSession?.legacy) return;
       try {
         const data = await authenticated('/api/v1/peers');
         sendTarget.replaceChildren();
+        fileTarget.replaceChildren();
         for (const target of data.targets) {
           const option = document.createElement('option'); option.value = target.id; option.textContent = target.name; sendTarget.append(option);
+          fileTarget.append(option.cloneNode(true));
         }
       } catch (error) { remoteShow(error.message, true); }
+    }
+
+    async function requestRemoteFile(entry, inline) {
+      const tab = inline ? window.open('', '_blank') : null;
+      try {
+        const data = await authenticated('/api/v1/file-transfers/' + encodeURIComponent(entry.id) + '/download' + (inline ? '?inline=1' : ''), { method: 'POST' });
+        if (tab) tab.location.href = data.url; else window.location.assign(data.url);
+      } catch (error) { if (tab) tab.close(); fileShow(error.message, true); }
+    }
+
+    async function refreshFileInbox() {
+      if (!deviceToken || currentSession?.legacy) {
+        fileList.replaceChildren(); const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = '安全配对后可使用文件中转'; fileList.append(empty); return;
+      }
+      try {
+        const data = await authenticated('/api/v1/file-inbox');
+        fileMode.textContent = data.transfers.length ? '文件 · ' + data.transfers.length : '文件';
+        renderFileList(fileList, data.transfers, {
+          onOpen: (entry) => requestRemoteFile(entry, true),
+          onDownload: (entry) => requestRemoteFile(entry, false),
+          onDelete: async (entry) => {
+            try { await authenticated('/api/v1/file-transfers/' + encodeURIComponent(entry.id), { method: 'DELETE' }); fileShow('文件已删除'); await refreshFileInbox(); }
+            catch (error) { fileShow(error.message, true); }
+          }
+        });
+      } catch (error) { fileList.textContent = error.message; }
     }
 
     async function refreshInbox() {
@@ -614,6 +816,16 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     }
     for (const tab of tabs) tab.addEventListener('click', () => activateTab(tab.dataset.tab));
 
+    function activateMode(mode) {
+      const showFiles = mode === 'file';
+      textMode.setAttribute('aria-selected', String(!showFiles)); fileMode.setAttribute('aria-selected', String(showFiles));
+      clipboardWorkspace.hidden = showFiles; fileWorkspace.hidden = !showFiles;
+      remoteShow(''); fileShow('');
+      if (showFiles) refreshFileInbox();
+    }
+    textMode.addEventListener('click', () => activateMode('text'));
+    fileMode.addEventListener('click', () => activateMode('file'));
+
     document.querySelector('#send-to-computer').addEventListener('click', async () => {
       const button = document.querySelector('#send-to-computer'); button.disabled = true; remoteShow('正在发送…');
       try {
@@ -636,6 +848,31 @@ function remoteModeScript({ deviceName, clientDevice, legacyToken, pairingCode }
     });
     document.querySelector('#copy-to-device').addEventListener('click', async () => {
       const field = document.querySelector('#received-text'); remoteShow(await copyText(field.value, field) ? '已复制到此设备的剪贴板' : '已选中文字，请长按并选择“复制”', false);
+    });
+    fileInput.addEventListener('change', () => {
+      const selectedFiles = [...fileInput.files];
+      fileSummary.textContent = selectedFiles.length ? selectedFiles.length + ' 个文件 · ' + formatBytes(selectedFiles.reduce((sum, file) => sum + file.size, 0)) : '单文件上限 ' + fileLimitLabel;
+      sendFiles.disabled = !selectedFiles.length || !fileTarget.value || currentSession?.legacy;
+    });
+    sendFiles.addEventListener('click', async () => {
+      const selectedFiles = [...fileInput.files];
+      if (!selectedFiles.length || !fileTarget.value || currentSession?.legacy) return;
+      sendFiles.disabled = true; cancelFiles.hidden = false; fileProgress.hidden = false; fileProgress.value = 0;
+      try {
+        for (const [index, file] of selectedFiles.entries()) {
+          fileShow('正在发送 ' + file.name + '…');
+          await uploadFile(file, fileTarget.value, deviceToken, (fraction) => { fileProgress.value = (index + fraction) / selectedFiles.length; }, (xhr) => { currentUpload = xhr; });
+        }
+        fileProgress.value = 1; fileShow('已发送 ' + selectedFiles.length + ' 个文件'); fileInput.value = ''; fileSummary.textContent = '单文件上限 ' + fileLimitLabel;
+      } catch (error) { fileShow(error.message, true); }
+      finally { currentUpload = null; cancelFiles.hidden = true; sendFiles.disabled = !fileInput.files.length || !fileTarget.value || currentSession?.legacy; }
+    });
+    cancelFiles.addEventListener('click', () => currentUpload?.abort());
+    document.querySelector('#refresh-files').addEventListener('click', refreshFileInbox);
+    document.querySelector('#clear-files').addEventListener('click', async () => {
+      if (currentSession?.legacy || !confirm('删除发给此设备的全部待接收文件？')) return;
+      try { const data = await authenticated('/api/v1/file-inbox', { method: 'DELETE' }); fileShow('已清理 ' + data.removed + ' 个文件'); await refreshFileInbox(); }
+      catch (error) { fileShow(error.message, true); }
     });
     document.querySelector('#clear-history').addEventListener('click', async () => {
       if (!confirm('清空与这台设备有关的剪贴板历史？')) return;
@@ -670,6 +907,13 @@ function deviceTypeFromLabel(label) {
   if (text.includes("mac")) return "mac";
   if (text.includes("windows")) return "windows";
   return "other";
+}
+
+function formatFileLimit(bytes) {
+  const safeBytes = Number.isFinite(bytes) && bytes > 0 ? bytes : 256 * 1024 * 1024;
+  if (safeBytes % (1024 * 1024 * 1024) === 0) return `${safeBytes / (1024 * 1024 * 1024)} GB`;
+  if (safeBytes % (1024 * 1024) === 0) return `${safeBytes / (1024 * 1024)} MB`;
+  return `${Math.round(safeBytes / 1024)} KB`;
 }
 
 function escapeHtml(value) {
