@@ -19,5 +19,9 @@ if ! command -v swiftc >/dev/null 2>&1; then
   exit 1
 fi
 
-APP_PATH="$("$PROJECT_ROOT/macos/build-app.sh")"
+BUILD_SCRIPT="$PROJECT_ROOT/macos/build-app.sh"
+# Files extracted from a browser download can retain macOS quarantine metadata.
+# Let the trusted system shell read the build script instead of asking Launch
+# Services to execute that quarantined child file as a standalone program.
+APP_PATH="$(/bin/bash "$BUILD_SCRIPT")"
 open "$APP_PATH"

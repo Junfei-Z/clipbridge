@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1 - 2026-09-03
+
+### Fixed
+
+- The macOS launcher now asks the trusted system `/bin/bash` to read `build-app.sh`, preventing Gatekeeper from treating the quarantined child script as a second unverified application.
+- Locally compiled menu bar bundles now receive an ad-hoc code signature before they are opened.
+
 ## 0.5.0 - 2026-09-03
 
 ### Added
