@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.10 - 2026-09-04
+
+### Fixed
+
+- Replaced the old mascot everywhere it was still shipped, including the public GitHub Pages PWA.
+- Restored the redesigned master to the established 1024×1024 dimensions instead of changing the source asset size.
+
+### Verified
+
+- Automated checks lock every PNG to its previous dimensions, the favicon to three resolutions, and the Windows tray icon to nine resolutions.
+- The private application repository and public homepage now serve the same redesigned mascot assets.
+
 ## 0.7.9 - 2026-09-04
 
 ### Changed
