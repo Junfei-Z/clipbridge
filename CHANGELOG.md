@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.3 - 2026-09-04
+
+### Fixed
+
+- The default Windows and macOS clipboard modules are now adapted to the `readText`/`writeText` contract used by the HTTP relay instead of exposing mismatched export names.
+- Unexpected relay request failures now log their route and underlying error without logging clipboard contents.
+- macOS `pbcopy` and `pbpaste` now run with an explicit UTF-8 locale, preserving Chinese and other Unicode text when ClipBridge is launched from Finder rather than Terminal.
+- The native Mac app now supplies an AppKit clipboard helper that decodes and encodes UTF-8 explicitly, avoiding locale-dependent `pbcopy` mojibake when launched from Finder.
+
 ## 0.5.2 - 2026-09-04
 
 ### Fixed

@@ -11,6 +11,8 @@ test("the Mac launcher reads a quarantined child script through the system shell
   assert.doesNotMatch(launcher, /APP_PATH="\$\("\$PROJECT_ROOT\/macos\/build-app\.sh"\)"/);
   assert.match(builder, /xcrun clang -fobjc-arc/);
   assert.match(builder, /ClipBridgeMenuBar\.m/);
+  assert.match(builder, /ClipBridgeClipboard\.m/);
+  assert.match(appSource, /CLIPBRIDGE_CLIPBOARD_HELPER/);
   assert.doesNotMatch(builder, /^swiftc /m);
   assert.match(builder, /xattr -dr com\.apple\.quarantine "\$APP_DIR"/);
   assert.match(builder, /codesign --force --deep --sign - "\$APP_DIR"/);

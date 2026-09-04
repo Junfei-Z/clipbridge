@@ -12,10 +12,14 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 xcrun clang -fobjc-arc "$SCRIPT_DIR/ClipBridgeMenuBar.m" \
   -framework AppKit -framework Foundation \
   -o "$CONTENTS/MacOS/ClipBridge"
+xcrun clang -fobjc-arc "$SCRIPT_DIR/ClipBridgeClipboard.m" \
+  -framework AppKit -framework Foundation \
+  -o "$CONTENTS/Resources/clipbridge-clipboard"
 cp "$SCRIPT_DIR/Info.plist" "$CONTENTS/Info.plist"
 cp "$PROJECT_ROOT/assets/brand-icon-96.png" "$CONTENTS/Resources/brand-icon-96.png"
 command -v node > "$CONTENTS/Resources/node-path"
 chmod +x "$CONTENTS/MacOS/ClipBridge"
+chmod +x "$CONTENTS/Resources/clipbridge-clipboard"
 
 # Copying resources from a browser-downloaded archive can propagate quarantine
 # into the generated bundle. Remove it only from this local build artifact;

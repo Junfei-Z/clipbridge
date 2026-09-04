@@ -97,6 +97,8 @@
     NSMutableDictionary *env = [NSProcessInfo.processInfo.environment mutableCopy];
     env[@"CLIPBRIDGE_LAUNCH_MODE"] = @"menubar";
     env[@"CLIPBRIDGE_INSTANCE_ID"] = self.instanceId;
+    NSURL *clipboardHelper = [NSBundle.mainBundle URLForResource:@"clipbridge-clipboard" withExtension:nil];
+    if (clipboardHelper) env[@"CLIPBRIDGE_CLIPBOARD_HELPER"] = clipboardHelper.path;
     task.environment = env; task.standardOutput = out; task.standardError = err;
     __weak typeof(self) weakSelf = self;
     task.terminationHandler = ^(NSTask *ended) { dispatch_async(dispatch_get_main_queue(), ^{

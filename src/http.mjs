@@ -12,7 +12,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.5.2";
+const APP_VERSION = "0.5.3";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -647,6 +647,9 @@ export function createClipBridgeServer({
 
       json(response, 404, { error: "Not found." });
     } catch (error) {
+      if (!error.status) {
+        console.error(`Request failed for ${request.method} ${requestUrl.pathname}:`, error);
+      }
       json(response, error.status ?? 500, {
         error: error.status ? error.message : "Clipboard operation failed."
       });

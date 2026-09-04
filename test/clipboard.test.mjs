@@ -17,9 +17,20 @@ test("selects a clipboard adapter for Windows and macOS relay nodes", () => {
   assert.throws(() => createClipboardAdapter("linux", { windows, macos }), /do not support linux/);
 });
 
+test("default platform adapters expose the HTTP clipboard contract", () => {
+  for (const platform of ["win32", "darwin"]) {
+    const adapter = createClipboardAdapter(platform);
+    assert.equal(typeof adapter.readText, "function");
+    assert.equal(typeof adapter.writeText, "function");
+  }
+});
+
 test("uses pbpaste and pbcopy without changing Unicode text", async () => {
   const calls = [];
-  const spawnProcess = (command) => {
+  const spawnProcess = (command, args, options) => {
+    assert.deepEqual(args, []);
+    assert.equal(options.env.LANG, "en_US.UTF-8");
+    assert.equal(options.env.LC_CTYPE, "UTF-8");
     const child = new EventEmitter();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();

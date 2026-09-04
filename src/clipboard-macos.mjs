@@ -1,8 +1,15 @@
 import { spawn } from "node:child_process";
 
-function runCommand(command, input = null, spawnProcess = spawn) {
+function runCommand(command, args = [], input = null, spawnProcess = spawn) {
   return new Promise((resolve, reject) => {
-    const child = spawnProcess(command, [], { stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawnProcess(command, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        LANG: "en_US.UTF-8",
+        LC_CTYPE: "UTF-8"
+      }
+    });
     const stdout = [];
     const stderr = [];
 
@@ -22,10 +29,14 @@ function runCommand(command, input = null, spawnProcess = spawn) {
 }
 
 export function createMacClipboard({ spawnProcess = spawn } = {}) {
+  const helper = process.env.CLIPBRIDGE_CLIPBOARD_HELPER;
   return {
-    readText: () => runCommand("/usr/bin/pbpaste", null, spawnProcess),
+    readText: () => helper
+      ? runCommand(helper, ["read"], null, spawnProcess)
+      : runCommand("/usr/bin/pbpaste", [], null, spawnProcess),
     writeText: async (text) => {
-      await runCommand("/usr/bin/pbcopy", String(text), spawnProcess);
+      if (helper) await runCommand(helper, ["write"], String(text), spawnProcess);
+      else await runCommand("/usr/bin/pbcopy", [], String(text), spawnProcess);
     }
   };
 }
