@@ -22,27 +22,20 @@
     </section>
 
     <section class="card" id="connect-card">
-      <div class="section-title"><span>1</span><div><h3>建立连接</h3><p>在两台设备上打开此页面，通过聊天工具交换一次性连接码。</p></div></div>
+      <div class="section-title"><span>1</span><div><h3>建立连接</h3><p>创建一个 6 位临时房间码，另一台设备输入后自动直连。</p></div></div>
       <div class="choice-row">
         <button id="create" class="primary">创建连接</button>
         <button id="join">加入连接</button>
         <button id="disconnect" class="danger" disabled>断开</button>
       </div>
       <div id="creator-flow" class="flow" hidden>
-        <label>把邀请连接码发给另一台设备</label>
-        <textarea id="offer-out" readonly placeholder="正在生成…"></textarea>
-        <button data-copy="offer-out">复制邀请码</button>
-        <label>粘贴另一台设备返回的应答码</label>
-        <textarea id="answer-in" placeholder="粘贴应答码"></textarea>
-        <button id="apply-answer" class="primary">完成连接</button>
+        <p class="hint">让另一台设备扫描二维码，或输入下面的房间码。房间 5 分钟后失效。</p>
+        <div class="room-share"><div><span class="room-label">房间码</span><output id="room-code">······</output><button id="copy-room">复制房间码</button></div><div id="room-qr" class="qr" aria-label="房间二维码"></div></div>
       </div>
       <div id="joiner-flow" class="flow" hidden>
-        <label>粘贴对方发来的邀请连接码</label>
-        <textarea id="offer-in" placeholder="粘贴邀请码"></textarea>
-        <button id="make-answer" class="primary">生成应答码</button>
-        <label>把应答码发回创建连接的设备</label>
-        <textarea id="answer-out" readonly placeholder="等待生成…"></textarea>
-        <button data-copy="answer-out">复制应答码</button>
+        <label for="room-input">输入另一台设备上的 6 位房间码</label>
+        <input id="room-input" class="room-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+        <button id="join-room" class="primary">加入房间</button>
       </div>
       <p id="connect-message" class="message" aria-live="polite"></p>
     </section>
@@ -66,6 +59,7 @@
     </section>
     <footer>ClipBridge 不上传传输内容 · <a href="https://github.com/Junfei-Z/clipbridge">源代码</a></footer>
   </main>
+  <script src="./vendor/qrcode.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

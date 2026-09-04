@@ -4,12 +4,11 @@ Open `https://junfei-z.github.io/clipbridge/` in a current Safari, Chrome, Edge,
 
 ## Connect two devices
 
-1. The creator selects **创建连接** and sends the generated invitation code through an existing trusted channel.
-2. The joiner selects **加入连接**, pastes the invitation, selects **生成应答码**, and sends the answer back.
-3. The creator pastes the answer and selects **完成连接**.
-4. Both status badges change to **已直连** when the WebRTC DataChannel is ready.
+1. The creator selects **创建连接** to receive a temporary 6-digit room code and QR code.
+2. The joiner selects **加入连接** and enters the code, or scans the QR code.
+3. Both status badges change to **已直连** when the WebRTC DataChannel is ready.
 
-Invitation and answer codes are one-session WebRTC descriptions. They can expose IP addressing metadata to the intended peer and should not be posted publicly. Reloading either page ends the session.
+The room expires after five minutes and accepts only a creator and one joiner. A Cloudflare Durable Object forwards the temporary WebRTC offer and answer, then the browser closes the signaling WebSocket as soon as the direct connection opens. The signaling service never receives transferred text or files. Reloading either page ends the session.
 
 ## Transfer behavior
 
@@ -20,7 +19,7 @@ Invitation and answer codes are one-session WebRTC descriptions. They can expose
 
 ## Network limitations
 
-The app uses public STUN endpoints for NAT discovery. Two devices behind restrictive corporate, carrier, or symmetric NAT may fail to connect without TURN. ClipBridge 0.6.0 intentionally does not upload content to an unknown fallback relay.
+The app uses public STUN endpoints for NAT discovery. Two devices behind restrictive corporate, carrier, or symmetric NAT may fail to connect without TURN. ClipBridge intentionally does not upload content to an unknown fallback relay. The short-code service is hosted at `clipbridge-signal.junfei.workers.dev`; networks that block `workers.dev` need an accessible custom Worker domain.
 
 ## Install
 

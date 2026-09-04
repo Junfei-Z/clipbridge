@@ -1,6 +1,6 @@
 {
   "name": "clipbridge",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "A local-first relay and WebRTC peer-to-peer text and file bridge.",
   "type": "module",
@@ -9,7 +9,10 @@
     "pretest": "npm run build:web",
     "test": "node --test",
     "build:mac": "bash macos/build-app.sh",
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "signal:dev": "wrangler dev --config worker/wrangler.jsonc --port 8787",
+    "signal:check": "wrangler deploy --config worker/wrangler.jsonc --dry-run",
+    "signal:deploy": "wrangler deploy --config worker/wrangler.jsonc"
   },
   "engines": {
     "node": ">=20"
@@ -17,5 +20,8 @@
   "license": "MIT",
   "dependencies": {
     "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   }
 }

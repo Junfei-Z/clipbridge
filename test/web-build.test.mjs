@@ -12,10 +12,13 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.match(app, /RTCPeerConnection/);
   assert.match(app, /SHA-256/);
   assert.match(app, /48\*1024/);
+  assert.match(app, /rooms\/\$\{code\}\/connect/);
+  assert.match(html, /id="room-input"/);
+  assert.doesNotMatch(html, /offer-out|answer-in/);
 });
 
 test("the web build contains the offline shell and PWA icons", async () => {
-  for (const path of ["index.html", "404.html", "app.js", "sw.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png"]) {
+  for (const path of ["index.html", "404.html", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png"]) {
     assert.ok((await stat(new URL(`../dist/web/${path}`, import.meta.url))).size > 0, path);
   }
 });

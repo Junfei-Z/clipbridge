@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.2 - 2026-09-04
+
+### Added
+
+- Six-digit temporary room codes and local QR codes replace multi-kilobyte manual WebRTC descriptions.
+- A Cloudflare Worker and per-room SQLite Durable Object automatically exchange only the WebRTC offer and answer over hibernatable WebSockets.
+- Five-minute room expiry, a two-device limit, creator tokens, allowed-origin checks, and bounded signaling messages.
+
+### Verified
+
+- All 53 automated tests and the Wrangler deployment dry-run pass.
+- Local end-to-end browser testing created a six-digit room, connected two tabs automatically, and preserved Chinese text and emoji.
+
 ## 0.6.1 - 2026-09-04
 
 ### Fixed

@@ -13,11 +13,11 @@ Version 0.6 also provides an HTTPS PWA at `https://junfei-z.github.io/clipbridge
 ## Online WebRTC transfer in 0.6
 
 1. Open `https://junfei-z.github.io/clipbridge/` on both devices.
-2. On one device choose **创建连接**, then send its one-time invitation code to the other device.
-3. On the other device choose **加入连接**, paste the invitation, generate an answer, and send that answer back.
-4. Paste the answer on the creating device. When both pages show **已直连**, send text or files in either direction.
+2. On one device choose **创建连接** to get a temporary 6-digit room code and QR code.
+3. On the other device choose **加入连接** and enter the room code, or scan the QR code.
+4. When both pages show **已直连**, send text or files in either direction.
 
-The public PWA has no account and no content database. Connection codes contain ephemeral network negotiation metadata, so share them only with the intended device. Some restrictive networks may require a TURN relay; 0.6.0 reports connection failure rather than uploading content to an untrusted fallback. See [the online PWA guide](docs/online-pwa.md).
+The public PWA has no account and no content database. A Cloudflare Durable Object relays only the temporary WebRTC offer and answer; each 6-digit room expires after five minutes and accepts two devices. Text and file contents continue to travel directly between browsers. Some restrictive networks may require a TURN relay; ClipBridge reports connection failure rather than uploading content to an untrusted fallback. See [the online PWA guide](docs/online-pwa.md).
 
 ## What works in 0.5
 
