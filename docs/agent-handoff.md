@@ -11,6 +11,12 @@
 
 Free-form replies are accepted as a fallback, but the official prompt produces a more reliable cross-device handoff.
 
+## Connection and multiple computers
+
+Agent Handoff does not maintain a direct online connection to one named computer. Its connection target is the selected GitHub repository. The desktop UI shows that repository as online when the local project is valid and its `origin` points to GitHub.
+
+A handoff is published once as a repository branch. Any number of computers with access to that repository can fetch and inspect it, so the current design already supports discovery from three or more computers. It is not yet addressed to selected devices; explicit one-device or multi-select delivery can be added later without changing the package format.
+
 Agent Handoff moves a repository task between computers without copying a vendor-specific chat session. Git carries committed project history; ClipBridge adds a small, reviewable package for the unfinished work and the context the next agent needs.
 
 ## What is transferred

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.4 - 2026-09-04
+
+### Changed
+
+- Agent Handoff now shows its real connection target: the selected GitHub repository, rather than implying a direct connection to one computer.
+- The connection banner explains that every authorized computer can fetch the published handoff and that delivery is not currently device-targeted.
+- The primary action is renamed to “Publish handoff to this repository” for a clearer mental model.
+
 ## 0.7.3 - 2026-09-04
 
 ### Added

@@ -115,6 +115,12 @@ export function renderDashboard({
     .environment-item[data-ok="false"] strong { color: #a66316; }
     .environment-detail { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .prompt-box { min-height: 190px; color: #39445a; background: #f7f5ff; }
+    .handoff-connection { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 11px 13px; border: 1px solid #e5e8ef; border-radius: 13px; color: #657086; background: #fafbfc; font-size: 12px; }
+    .handoff-connection .dot { background: #b9bec9; box-shadow: 0 0 0 4px #8a93a622; }
+    .handoff-connection[data-online="true"] { border-color: #bce8d0; background: #f1fbf5; }
+    .handoff-connection[data-online="true"] .dot { background: #20b26b; box-shadow: 0 0 0 4px #20b26b22; }
+    .handoff-connection strong { display: block; color: #273147; }
+    .handoff-connection span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .compact-area { min-height: 88px; font-family: inherit; font-size: 14px; }
     .handoff-list { display: grid; gap: 9px; margin-top: 16px; }
     .handoff-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid #eceef3; border-radius: 14px; background: #fafbfc; }
@@ -428,6 +434,7 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
           <div class="environment-item" data-key="repository"><strong>○ Git 项目</strong><span class="environment-detail">等待目录</span></div>
           <div class="environment-item" data-key="github"><strong>○ GitHub</strong><span class="environment-detail">等待远端</span></div>
         </div>
+        <div class="handoff-connection" id="handoff-connection" data-online="false"><span class="dot" aria-hidden="true"></span><span><strong id="handoff-connection-title">尚未连接交接仓库</strong><span id="handoff-connection-detail">选择有效的 GitHub 项目后，所有有仓库权限的电脑都可以获取这份交接。</span></span></div>
         <div class="agent-grid">
           <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
           <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
@@ -443,7 +450,7 @@ END_CLIPBRIDGE_HANDOFF</textarea></label>
           <div class="actions"><button class="secondary" id="copy-handoff-prompt">复制官方 Prompt</button></div>
           <label>3. 粘贴 Agent 的完整回复<textarea id="handoff-response" placeholder="把 Agent 按照上面格式生成的完整回复粘贴到这里…"></textarea></label>
         </div>
-        <div class="actions"><button class="primary" id="create-handoff">4. 创建并推送交接</button><button class="secondary" id="refresh-handoffs">获取待接手任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
+        <div class="actions"><button class="primary" id="create-handoff">4. 发布交接到此仓库</button><button class="secondary" id="refresh-handoffs">获取待接手任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
         <div class="message" id="handoff-message" role="status" aria-live="polite"></div>
         <div class="handoff-list" id="handoff-list"><div class="empty">输入 Git 项目目录，然后获取待接手任务。</div></div>
         <pre class="handoff-preview" id="handoff-preview" hidden></pre>
@@ -596,6 +603,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const localAgentWorkspace = document.querySelector('#local-agent-workspace');
     const handoffRepository = document.querySelector('#handoff-repository');
     const handoffEnvironmentBar = document.querySelector('#handoff-environment');
+    const handoffConnection = document.querySelector('#handoff-connection');
     const handoffPrompt = document.querySelector('#handoff-prompt');
     const handoffResponse = document.querySelector('#handoff-response');
     const handoffList = document.querySelector('#handoff-list');
@@ -624,6 +632,12 @@ function localModeScript({ fileLimitLabel, relayNode }) {
           item.querySelector('.environment-detail').textContent = status.detail;
           item.title = status.detail;
         }
+        const connected = data.repository.ok && data.github.ok;
+        handoffConnection.dataset.online = String(connected);
+        document.querySelector('#handoff-connection-title').textContent = connected ? '已连接 GitHub 交接仓库' : '尚未连接交接仓库';
+        document.querySelector('#handoff-connection-detail').textContent = connected
+          ? data.github.detail + ' · 所有有权限的电脑均可获取，当前不是定向发送。'
+          : '请选择带有 GitHub origin 的 Git 项目；这不是与某台电脑的直接在线连接。';
       } catch (error) { handoffShow(error.message, true); }
     }
 
