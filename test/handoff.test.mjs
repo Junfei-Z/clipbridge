@@ -46,7 +46,7 @@ test("verifies and applies a handoff patch to a clean clone", async () => {
   await git(target, ["fetch", source, "refs/heads/clipbridge/handoff/apply-test:refs/remotes/origin/clipbridge/handoff/apply-test"]);
   const result = await applyHandoff("apply-test", { cwd: target });
   assert.equal(result.applied, true);
-  assert.equal(await readFile(join(target, "work.txt"), "utf8"), "transferred 苹果 🍎\n");
+  assert.equal((await readFile(join(target, "work.txt"), "utf8")).replaceAll("\r\n", "\n"), "transferred 苹果 🍎\n");
 });
 
 test("detects common credentials in a patch", () => {

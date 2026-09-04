@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 - 2026-09-04
+
+### Fixed
+
+- The cross-device handoff test now accepts Git's expected CRLF checkout behavior on Windows while still asserting exact Unicode content.
+
 ## 0.7.0 - 2026-09-04
 
 ### Added
