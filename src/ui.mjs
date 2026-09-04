@@ -121,6 +121,14 @@ export function renderDashboard({
     .handoff-connection[data-online="true"] .dot { background: #20b26b; box-shadow: 0 0 0 4px #20b26b22; }
     .handoff-connection strong { display: block; color: #273147; }
     .handoff-connection span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .clone-panel { padding: 13px; border: 1px solid #e8e4fb; border-radius: 14px; background: #faf8ff; }
+    .clone-panel summary { color: #4e2ad5; cursor: pointer; font-size: 13px; font-weight: 750; }
+    .clone-fields { display: grid; gap: 10px; margin-top: 13px; }
+    .github-account { display: flex; align-items: center; gap: 10px; padding: 12px 13px; border: 1px solid #e5e8ef; border-radius: 14px; background: #fafbfc; }
+    .github-account[data-authenticated="true"] { border-color: #bce8d0; background: #f1fbf5; }
+    .github-account-copy { flex: 1; min-width: 0; }
+    .github-account-copy strong, .github-account-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .github-account-copy span { margin-top: 2px; color: #7b8497; font-size: 11px; }
     .compact-area { min-height: 88px; font-family: inherit; font-size: 14px; }
     .handoff-list { display: grid; gap: 9px; margin-top: 16px; }
     .handoff-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid #eceef3; border-radius: 14px; background: #fafbfc; }
@@ -436,6 +444,14 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
         </div>
         <div class="handoff-connection" id="handoff-connection" data-online="false"><span class="dot" aria-hidden="true"></span><span><strong id="handoff-connection-title">尚未连接交接仓库</strong><span id="handoff-connection-detail">选择有效的 GitHub 项目后，所有有仓库权限的电脑都可以获取这份交接。</span></span></div>
         <div class="agent-grid">
+          <div class="github-account" id="github-account" data-authenticated="false"><span class="device-badge">GH</span><span class="github-account-copy"><strong id="github-account-title">正在检查 GitHub 登录…</strong><span id="github-account-detail">登录信息只从本机 GitHub CLI 读取</span></span><button class="quiet" id="refresh-github-account">刷新</button></div>
+          <details class="clone-panel" id="clone-panel"><summary>这台电脑还没有这个项目？从 GitHub 拉取</summary><div class="clone-fields">
+            <label id="github-repository-picker-label" hidden>选择账户中的仓库<select id="github-repository-picker"><option value="">选择 GitHub 仓库…</option></select></label>
+            <label>GitHub 仓库地址<input id="clone-repository-url" inputmode="url" placeholder="https://github.com/用户名/项目名.git"></label>
+            <label>保存到固定项目目录<input id="clone-projects-directory" placeholder="正在读取默认目录…"></label>
+            <div class="actions"><button class="primary" id="clone-github-project">拉取项目并使用</button><button class="secondary" id="copy-github-login" hidden>复制 GitHub 登录命令</button></div>
+            <p class="helper">项目会保存到“固定目录/仓库名”。私有仓库需要这台电脑已经配置 GitHub 凭据。</p>
+          </div></details>
           <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
           <div class="actions"><button class="secondary" id="register-agent-computer">登记当前电脑</button><button class="quiet" id="refresh-agent-computers">刷新 Agent 电脑</button></div>
           <div class="target-block"><div class="target-label">交接对象（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
@@ -611,6 +627,12 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const handoffTargets = document.querySelector('#handoff-targets');
     const registerAgentComputerButton = document.querySelector('#register-agent-computer');
     const refreshAgentComputersButton = document.querySelector('#refresh-agent-computers');
+    const githubAccount = document.querySelector('#github-account');
+    const githubRepositoryPicker = document.querySelector('#github-repository-picker');
+    const cloneRepositoryUrl = document.querySelector('#clone-repository-url');
+    const cloneProjectsDirectory = document.querySelector('#clone-projects-directory');
+    const cloneGithubProjectButton = document.querySelector('#clone-github-project');
+    const copyGithubLoginButton = document.querySelector('#copy-github-login');
     const handoffList = document.querySelector('#handoff-list');
     const handoffPreview = document.querySelector('#handoff-preview');
     const handoffMessage = document.querySelector('#handoff-message');
@@ -623,6 +645,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     let localUpload = null;
     let environmentTimer = null;
     let currentHandoffRemote = '';
+    let githubLoginCommand = 'gh auth login --web --git-protocol https';
 
     const handoffShow = (text, error = false) => { handoffMessage.textContent = text; handoffMessage.style.color = error ? '#d14343' : ''; };
     const repositoryQuery = () => '?repository=' + encodeURIComponent(handoffRepository.value.trim() || '.');
@@ -657,6 +680,39 @@ function localModeScript({ fileLimitLabel, relayNode }) {
       } catch (error) { handoffShow(error.message, true); }
     }
 
+    async function loadGithubAccount() {
+      try {
+        const data = await apiJson('/api/v1/github-account');
+        githubLoginCommand = data.loginCommand;
+        githubAccount.dataset.authenticated = String(data.authenticated);
+        document.querySelector('#github-account-title').textContent = data.authenticated ? 'GitHub · ' + data.account.login : 'GitHub 尚未登录';
+        document.querySelector('#github-account-detail').textContent = data.detail;
+        copyGithubLoginButton.hidden = data.authenticated;
+        const label = document.querySelector('#github-repository-picker-label');
+        label.hidden = !data.authenticated;
+        githubRepositoryPicker.replaceChildren();
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = '选择 GitHub 仓库…'; githubRepositoryPicker.append(placeholder);
+        for (const repository of data.repositories) {
+          const option = document.createElement('option'); option.value = repository.url + '.git'; option.textContent = repository.nameWithOwner + (repository.isPrivate ? ' · 私有' : ''); githubRepositoryPicker.append(option);
+        }
+      } catch (error) { document.querySelector('#github-account-detail').textContent = error.message; }
+    }
+
+    async function loadCloneDefaults() {
+      try { cloneProjectsDirectory.value = (await apiJson('/api/v1/github-clone')).projectsDirectory; } catch {}
+    }
+
+    async function cloneGithubProject() {
+      cloneGithubProjectButton.disabled = true; handoffShow('正在从 GitHub 拉取项目…');
+      try {
+        const data = await apiJson('/api/v1/github-clone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repositoryUrl: cloneRepositoryUrl.value, projectsDirectory: cloneProjectsDirectory.value }) });
+        handoffRepository.value = data.root; document.querySelector('#clone-panel').open = false;
+        handoffShow('项目已拉取到 ' + data.root + '，正在登记当前电脑…');
+        await checkHandoffEnvironment(); await registerCurrentAgentComputer();
+      } catch (error) { handoffShow(error.message, true); }
+      finally { cloneGithubProjectButton.disabled = false; }
+    }
+
     async function refreshAgentComputers(fetchRemote = true) {
       refreshAgentComputersButton.disabled = true;
       try {
@@ -689,7 +745,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         document.querySelector('#local-' + mode + '-mode').setAttribute('aria-selected', String(active));
       }
       if (name === 'file') refreshLocalFiles();
-      if (name === 'agent') checkHandoffEnvironment();
+      if (name === 'agent') { checkHandoffEnvironment(); loadGithubAccount(); loadCloneDefaults(); }
     }
 
     async function inspectHandoffFromUi(id) {
@@ -739,6 +795,12 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     registerAgentComputerButton.addEventListener('click', registerCurrentAgentComputer);
     refreshAgentComputersButton.addEventListener('click', () => refreshAgentComputers(true));
     handoffTargets.addEventListener('targetschange', updateHandoffDeliveryLabel);
+    document.querySelector('#refresh-github-account').addEventListener('click', loadGithubAccount);
+    githubRepositoryPicker.addEventListener('change', () => { if (githubRepositoryPicker.value) cloneRepositoryUrl.value = githubRepositoryPicker.value; });
+    cloneGithubProjectButton.addEventListener('click', cloneGithubProject);
+    copyGithubLoginButton.addEventListener('click', async () => {
+      handoffShow(await copyText(githubLoginCommand) ? '登录命令已复制，请在终端运行后点击“刷新”。' : '请在终端运行：' + githubLoginCommand);
+    });
     handoffRepository.addEventListener('input', () => { clearTimeout(environmentTimer); environmentTimer = setTimeout(checkHandoffEnvironment, 450); });
     refreshHandoffsButton.addEventListener('click', () => refreshHandoffs(true));
     createHandoffButton.addEventListener('click', async () => {

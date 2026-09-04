@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { hostname, platform, tmpdir } from "node:os";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, hostname, platform, tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -107,6 +107,61 @@ export async function handoffEnvironment(cwd = process.cwd()) {
       : { ok: false, detail: repo.remote ? "origin 不是 GitHub 仓库" : "未配置 origin" };
   } catch (error) {
     result.repository.detail = error.message;
+  }
+  return result;
+}
+
+export function defaultProjectsDirectory() {
+  return join(homedir(), "ClipBridge Projects");
+}
+
+function githubRepositorySlug(value) {
+  const source = String(value || "").trim();
+  const match = source.match(/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i);
+  if (!match) throw new Error("请输入完整的 GitHub 仓库地址，例如 https://github.com/owner/project.git");
+  return { owner: match[1], repository: match[2], source };
+}
+
+export async function cloneGitHubRepository(options = {}) {
+  const repo = githubRepositorySlug(options.repositoryUrl);
+  const projectsDirectory = resolve(options.projectsDirectory || defaultProjectsDirectory());
+  const destination = join(projectsDirectory, repo.repository);
+  await mkdir(projectsDirectory, { recursive: true });
+  try {
+    await access(destination);
+    throw new Error(`目标目录已经存在：${destination}`);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  try {
+    await git(projectsDirectory, ["clone", "--origin", "origin", repo.source, destination]);
+    return { root: destination, repository: `${repo.owner}/${repo.repository}`, remote: repo.source };
+  } catch (error) {
+    await rm(destination, { recursive: true, force: true });
+    if (/authentication|permission denied|repository not found|could not read username/i.test(error.message)) {
+      throw new Error("无法访问这个 GitHub 仓库。请先在这台电脑配置 GitHub 凭据，并确认当前账户拥有仓库权限。");
+    }
+    throw error;
+  }
+}
+
+export async function githubAccountStatus() {
+  const result = { cli: false, authenticated: false, account: null, repositories: [], loginCommand: "gh auth login --web --git-protocol https" };
+  try {
+    result.version = (await execFileAsync("gh", ["--version"], { encoding: "utf8" })).stdout.split("\n")[0];
+    result.cli = true;
+  } catch {
+    result.detail = "未安装 GitHub CLI（gh）";
+    return result;
+  }
+  try {
+    const user = JSON.parse((await execFileAsync("gh", ["api", "user"], { encoding: "utf8", env: { ...process.env, GH_PROMPT_DISABLED: "1" } })).stdout);
+    result.authenticated = true;
+    result.account = { login: user.login, name: user.name || user.login, avatarUrl: user.avatar_url };
+    result.repositories = JSON.parse((await execFileAsync("gh", ["repo", "list", "--limit", "100", "--json", "nameWithOwner,url,isPrivate,updatedAt"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GH_PROMPT_DISABLED: "1" } })).stdout);
+    result.detail = `已登录 ${result.account.login}`;
+  } catch {
+    result.detail = "GitHub CLI 尚未登录";
   }
   return result;
 }

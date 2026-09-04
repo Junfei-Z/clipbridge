@@ -19,6 +19,19 @@ A handoff is published once as a repository branch. Each desktop can register it
 
 Registration and delivery metadata use dedicated `clipbridge/agent/*` and `clipbridge/handoff/*` branches. They do not switch or modify the active project branch, index, or working tree.
 
+## GitHub account and first-time clone
+
+ClipBridge reads the local GitHub CLI (`gh`) login state. It never sends the CLI token to the management page. When authenticated, the Agent page lists repositories available to that account.
+
+On a computer that does not yet have the project:
+
+1. Open **This computer does not have the project? Clone from GitHub**.
+2. Select a repository from the signed-in account, or paste its GitHub URL.
+3. Clone it into the default `ClipBridge Projects` directory.
+4. ClipBridge fills the new local path, checks the environment, and registers the computer automatically.
+
+If GitHub CLI is not authenticated, run the displayed `gh auth login --web --git-protocol https` command in a terminal, then refresh the account status. A future GitHub OAuth App can move this device authorization fully into the ClipBridge window.
+
 Agent Handoff moves a repository task between computers without copying a vendor-specific chat session. Git carries committed project history; ClipBridge adds a small, reviewable package for the unfinished work and the context the next agent needs.
 
 ## What is transferred

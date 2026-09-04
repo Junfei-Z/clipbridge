@@ -5,7 +5,7 @@ import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
-import { applyHandoff, createHandoff, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "./handoff.mjs";
+import { applyHandoff, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "./handoff.mjs";
 import { isRelayTargetId, managementSession, relayNodeIdentity } from "./identity.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -13,7 +13,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.7.5";
+const APP_VERSION = "0.7.6";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -363,6 +363,35 @@ export function createClipBridgeServer({
         }
         const repository = requestUrl.searchParams.get("repository") || process.cwd();
         json(response, 200, await handoffEnvironment(repository));
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/github-clone" && request.method === "GET") {
+        if (!isLocal) {
+          json(response, 403, { error: "GitHub 项目只能克隆到中转电脑本机。" });
+          return;
+        }
+        json(response, 200, { projectsDirectory: defaultProjectsDirectory() });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/github-account" && request.method === "GET") {
+        if (!isLocal) {
+          json(response, 403, { error: "GitHub 登录状态只能在当前电脑上读取。" });
+          return;
+        }
+        json(response, 200, await githubAccountStatus());
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/github-clone" && request.method === "POST") {
+        if (!isLocal) {
+          json(response, 403, { error: "GitHub 项目只能克隆到中转电脑本机。" });
+          return;
+        }
+        const body = await readJson(request, 64 * 1024);
+        const result = await cloneGitHubRepository({ repositoryUrl: body.repositoryUrl, projectsDirectory: body.projectsDirectory });
+        json(response, 201, result);
         return;
       }
 

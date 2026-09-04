@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.6 - 2026-09-04
+
+### Added
+
+- Local GitHub CLI account detection without exposing authentication tokens to the management page.
+- A repository picker populated from the signed-in GitHub account.
+- One-click cloning into the cross-platform `ClipBridge Projects` directory, followed by automatic environment detection and Agent computer registration.
+- Clear guidance and a copyable secure login command when GitHub CLI is not authenticated.
+
+### Security
+
+- Only GitHub HTTPS and SSH repository URLs are accepted by the clone endpoint.
+- Clone operations are local-only, non-interactive, and remove partial destination directories after failure.
+
+### Verified
+
+- A real signed-in GitHub account loaded 32 repositories without returning credentials, and the fixed clone directory rendered correctly.
+- All 62 automated tests pass and the native macOS app builds successfully.
+
 ## 0.7.5 - 2026-09-04
 
 ### Added

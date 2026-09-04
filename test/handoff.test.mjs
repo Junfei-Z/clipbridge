@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { applyHandoff, createHandoff, findSensitivePatch, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "../src/handoff.mjs";
+import { applyHandoff, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, findSensitivePatch, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "../src/handoff.mjs";
 
 const exec = promisify(execFile);
 const git = (cwd, args) => exec("git", args, { cwd, encoding: "utf8" });
@@ -95,4 +95,17 @@ test("filters targeted handoffs for the receiving Agent computer", async () => {
   assert.equal((await listHandoffs({ cwd: root, recipientId: "windows-work" })).length, 1);
   assert.equal((await listHandoffs({ cwd: root, recipientId: "mac-studio" })).length, 0);
   assert.deepEqual((await inspectHandoff("targeted-test", { cwd: root })).state.delivery.targetIds, ["windows-work"]);
+});
+
+test("provides a stable default clone directory and rejects non-GitHub sources", async () => {
+  assert.match(defaultProjectsDirectory(), /ClipBridge Projects$/);
+  await assert.rejects(() => cloneGitHubRepository({ repositoryUrl: "https://example.com/project.git" }), /GitHub 仓库地址/);
+});
+
+test("reports GitHub CLI account status without exposing credentials", async () => {
+  const status = await githubAccountStatus();
+  assert.equal(typeof status.cli, "boolean");
+  assert.equal(typeof status.authenticated, "boolean");
+  assert.equal(status.loginCommand, "gh auth login --web --git-protocol https");
+  assert.equal(JSON.stringify(status).includes("oauth_token"), false);
 });
