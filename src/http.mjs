@@ -5,7 +5,7 @@ import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
-import { applyHandoff, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "./handoff.mjs";
+import { applyHandoff, chooseProjectDirectory, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer, updateGitHubRepository } from "./handoff.mjs";
 import { isRelayTargetId, managementSession, relayNodeIdentity } from "./identity.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -13,7 +13,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.7.6";
+const APP_VERSION = "0.7.7";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -381,6 +381,26 @@ export function createClipBridgeServer({
           return;
         }
         json(response, 200, await githubAccountStatus());
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/project-directory" && request.method === "POST") {
+        if (!isLocal) {
+          json(response, 403, { error: "只能在当前电脑上选择项目目录。" });
+          return;
+        }
+        const directory = await chooseProjectDirectory(config.nodePlatform);
+        json(response, 200, { directory });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/github-update" && request.method === "POST") {
+        if (!isLocal) {
+          json(response, 403, { error: "只能在当前电脑上更新本地项目。" });
+          return;
+        }
+        const body = await readJson(request, 64 * 1024);
+        json(response, 200, await updateGitHubRepository(body.repository || process.cwd()));
         return;
       }
 

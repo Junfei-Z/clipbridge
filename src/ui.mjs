@@ -453,7 +453,7 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
             <p class="helper">项目会保存到“固定目录/仓库名”。私有仓库需要这台电脑已经配置 GitHub 凭据。</p>
           </div></details>
           <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
-          <div class="actions"><button class="secondary" id="register-agent-computer">登记当前电脑</button><button class="quiet" id="refresh-agent-computers">刷新 Agent 电脑</button></div>
+          <div class="actions"><button class="secondary" id="choose-project-directory">选择已有项目文件夹</button><button class="secondary" id="update-github-project">检查并更新</button><button class="secondary" id="register-agent-computer">登记当前电脑</button><button class="quiet" id="refresh-agent-computers">刷新 Agent 电脑</button></div>
           <div class="target-block"><div class="target-label">交接对象（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
           <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
 
@@ -633,6 +633,8 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const cloneProjectsDirectory = document.querySelector('#clone-projects-directory');
     const cloneGithubProjectButton = document.querySelector('#clone-github-project');
     const copyGithubLoginButton = document.querySelector('#copy-github-login');
+    const chooseProjectDirectoryButton = document.querySelector('#choose-project-directory');
+    const updateGithubProjectButton = document.querySelector('#update-github-project');
     const handoffList = document.querySelector('#handoff-list');
     const handoffPreview = document.querySelector('#handoff-preview');
     const handoffMessage = document.querySelector('#handoff-message');
@@ -711,6 +713,27 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         await checkHandoffEnvironment(); await registerCurrentAgentComputer();
       } catch (error) { handoffShow(error.message, true); }
       finally { cloneGithubProjectButton.disabled = false; }
+    }
+
+    async function chooseExistingProject() {
+      chooseProjectDirectoryButton.disabled = true; handoffShow('请在系统窗口中选择 Git 项目文件夹…');
+      try {
+        const data = await apiJson('/api/v1/project-directory', { method: 'POST' });
+        if (!data.directory) { handoffShow('未选择目录'); return; }
+        handoffRepository.value = data.directory; handoffShow('已选择项目目录'); await checkHandoffEnvironment();
+      } catch (error) { handoffShow(error.message.includes('User canceled') ? '已取消选择目录' : error.message, true); }
+      finally { chooseProjectDirectoryButton.disabled = false; }
+    }
+
+    async function updateExistingProject() {
+      updateGithubProjectButton.disabled = true; handoffShow('正在检查 GitHub 更新，本地修改不会被覆盖…');
+      try {
+        const data = await apiJson('/api/v1/github-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.' }) });
+        if (data.status === 'ahead') { handoffShow('本地比 GitHub 多 ' + data.ahead + ' 个提交，请先 push 后再交接。', true); return; }
+        handoffShow(data.updated ? '已安全快进更新 ' + data.behind + ' 个提交，正在登记当前电脑…' : '项目已经是 GitHub 最新版本，正在登记当前电脑…');
+        await checkHandoffEnvironment(); await registerCurrentAgentComputer();
+      } catch (error) { handoffShow(error.message, true); }
+      finally { updateGithubProjectButton.disabled = false; }
     }
 
     async function refreshAgentComputers(fetchRemote = true) {
@@ -801,6 +824,8 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     copyGithubLoginButton.addEventListener('click', async () => {
       handoffShow(await copyText(githubLoginCommand) ? '登录命令已复制，请在终端运行后点击“刷新”。' : '请在终端运行：' + githubLoginCommand);
     });
+    chooseProjectDirectoryButton.addEventListener('click', chooseExistingProject);
+    updateGithubProjectButton.addEventListener('click', updateExistingProject);
     handoffRepository.addEventListener('input', () => { clearTimeout(environmentTimer); environmentTimer = setTimeout(checkHandoffEnvironment, 450); });
     refreshHandoffsButton.addEventListener('click', () => refreshHandoffs(true));
     createHandoffButton.addEventListener('click', async () => {

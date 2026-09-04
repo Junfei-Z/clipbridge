@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { applyHandoff, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, findSensitivePatch, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "../src/handoff.mjs";
+import { applyHandoff, cloneGitHubRepository, createHandoff, defaultProjectsDirectory, findSensitivePatch, githubAccountStatus, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer, updateGitHubRepository } from "../src/handoff.mjs";
 
 const exec = promisify(execFile);
 const git = (cwd, args) => exec("git", args, { cwd, encoding: "utf8" });
@@ -108,4 +108,26 @@ test("reports GitHub CLI account status without exposing credentials", async () 
   assert.equal(typeof status.authenticated, "boolean");
   assert.equal(status.loginCommand, "gh auth login --web --git-protocol https");
   assert.equal(JSON.stringify(status).includes("oauth_token"), false);
+});
+
+test("fast-forwards an existing clean project and refuses dirty updates", async () => {
+  const root = await repository();
+  const remoteParent = await mkdtemp(join(tmpdir(), "clipbridge-github.com-"));
+  const remote = join(remoteParent, "github.com", "example.git");
+  await mkdir(join(remoteParent, "github.com"), { recursive: true });
+  await git(remoteParent, ["init", "--bare", remote]);
+  await git(root, ["remote", "add", "origin", remote]);
+  await git(root, ["push", "-u", "origin", "main"]);
+  await git(remote, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+  const peer = await mkdtemp(join(tmpdir(), "clipbridge-update-peer-"));
+  await git(peer, ["clone", remote, "."]);
+  await git(peer, ["config", "user.name", "Peer"]);
+  await git(peer, ["config", "user.email", "peer@example.invalid"]);
+  await writeFile(join(peer, "work.txt"), "new from GitHub\n", "utf8");
+  await git(peer, ["add", "work.txt"]); await git(peer, ["commit", "-m", "remote update"]); await git(peer, ["push"]);
+  const updated = await updateGitHubRepository(root);
+  assert.equal(updated.status, "updated");
+  assert.equal(await readFile(join(root, "work.txt"), "utf8"), "new from GitHub\n");
+  await writeFile(join(root, "work.txt"), "dirty\n", "utf8");
+  await assert.rejects(() => updateGitHubRepository(root), /未提交修改/);
 });

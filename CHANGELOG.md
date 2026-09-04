@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.7 - 2026-09-04
+
+### Added
+
+- Native project-folder selection for existing repositories on macOS and Windows, with a Linux desktop fallback.
+- Safe existing-project updates using `fetch --prune` and fast-forward-only merges.
+- Automatic environment recheck and Agent computer registration after a successful update.
+
+### Safety
+
+- Updates stop before changing files when the working tree is dirty, the current checkout is detached, the remote branch is missing, or local and remote histories have diverged.
+- Local commits that have not been pushed are reported instead of being overwritten or hidden.
+
+### Verified
+
+- A real two-clone Git test fast-forwarded an outdated project and rejected a subsequent dirty-worktree update.
+- All 63 automated tests pass and the native macOS app builds successfully.
+
 ## 0.7.6 - 2026-09-04
 
 ### Added

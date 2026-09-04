@@ -32,6 +32,12 @@ On a computer that does not yet have the project:
 
 If GitHub CLI is not authenticated, run the displayed `gh auth login --web --git-protocol https` command in a terminal, then refresh the account status. A future GitHub OAuth App can move this device authorization fully into the ClipBridge window.
 
+## Existing local project
+
+If the project is already present on a computer, do not clone it again. Choose **Select existing project folder**, then select the repository root—the folder in which `git status` works.
+
+Choose **Check and update** when that copy may be old. ClipBridge fetches from GitHub and only performs a fast-forward update when the working tree is clean and the histories have not diverged. Dirty work, detached checkouts, missing remote branches, divergent history, and unpushed local commits are reported for manual resolution instead of being overwritten.
+
 Agent Handoff moves a repository task between computers without copying a vendor-specific chat session. Git carries committed project history; ClipBridge adds a small, reviewable package for the unfinished work and the context the next agent needs.
 
 ## What is transferred

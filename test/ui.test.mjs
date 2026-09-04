@@ -54,6 +54,9 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /id="clone-repository-url"/);
   assert.match(html, /id="clone-projects-directory"/);
   assert.match(html, /id="clone-github-project"/);
+  assert.match(html, /id="choose-project-directory"/);
+  assert.match(html, /id="update-github-project"/);
+  assert.match(html, /检查并更新/);
   assert.match(html, /这台电脑还没有这个项目？从 GitHub 拉取/);
   assert.match(html, /交接对象（可多选/);
   assert.match(html, /所有有仓库权限的电脑都可以获取这份交接/);

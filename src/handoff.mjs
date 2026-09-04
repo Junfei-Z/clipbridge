@@ -166,6 +166,37 @@ export async function githubAccountStatus() {
   return result;
 }
 
+export async function updateGitHubRepository(cwd) {
+  const repo = await repositoryInfo(cwd || process.cwd());
+  if (!repo.remote || !/(?:github\.com[:/]|github\.com$)/i.test(repo.remote)) throw new Error("这个项目没有配置 GitHub origin。");
+  if (!repo.currentBranch) throw new Error("当前项目处于 detached HEAD，请先切换到需要更新的分支。");
+  const dirty = (await git(repo.root, ["status", "--porcelain"])).trim();
+  if (dirty) throw new Error("项目存在未提交修改，已停止更新以免覆盖本地工作。请先提交、暂存交接或清理修改。");
+  await git(repo.root, ["fetch", "--prune", "origin"]);
+  const remoteBranch = `origin/${repo.currentBranch}`;
+  try { await git(repo.root, ["rev-parse", "--verify", remoteBranch]); }
+  catch { throw new Error(`GitHub 上没有 ${repo.currentBranch} 分支，无法自动更新。`); }
+  const [ahead, behind] = (await git(repo.root, ["rev-list", "--left-right", "--count", `HEAD...${remoteBranch}`])).trim().split(/\s+/).map(Number);
+  if (ahead && behind) throw new Error(`本地与 GitHub 已分叉（本地多 ${ahead} 个提交，远端多 ${behind} 个提交），请人工合并。`);
+  if (ahead) return { root: repo.root, branch: repo.currentBranch, status: "ahead", ahead, behind: 0, updated: false };
+  if (!behind) return { root: repo.root, branch: repo.currentBranch, status: "current", ahead: 0, behind: 0, updated: false };
+  await git(repo.root, ["merge", "--ff-only", remoteBranch]);
+  return { root: repo.root, branch: repo.currentBranch, status: "updated", ahead: 0, behind, updated: true };
+}
+
+export async function chooseProjectDirectory(targetPlatform = platform()) {
+  if (targetPlatform === "darwin") {
+    const script = 'POSIX path of (choose folder with prompt "选择 Git 项目目录")';
+    return (await execFileAsync("osascript", ["-e", script], { encoding: "utf8" })).stdout.trim().replace(/\/$/, "");
+  }
+  if (targetPlatform === "win32") {
+    const script = "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='选择 Git 项目目录'; if($d.ShowDialog() -eq 'OK'){[Console]::OutputEncoding=[Text.Encoding]::UTF8; Write-Output $d.SelectedPath}";
+    return (await execFileAsync("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { encoding: "utf8" })).stdout.trim();
+  }
+  try { return (await execFileAsync("zenity", ["--file-selection", "--directory", "--title=选择 Git 项目目录"], { encoding: "utf8" })).stdout.trim(); }
+  catch { throw new Error("当前系统无法打开目录选择器，请手动输入项目完整路径。"); }
+}
+
 export async function repositoryInfo(cwd) {
   const root = (await git(cwd, ["rev-parse", "--show-toplevel"])).trim();
   const baseCommit = (await git(root, ["rev-parse", "HEAD"])).trim();
