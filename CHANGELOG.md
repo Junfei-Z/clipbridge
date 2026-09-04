@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 - 2026-09-04
+
+### Fixed
+
+- `npm test` now builds the static PWA first, so clean Windows and macOS CI runners can verify the generated offline shell and icons.
+
 ## 0.6.0 - 2026-09-04
 
 ### Added
