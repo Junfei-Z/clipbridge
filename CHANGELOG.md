@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.11 - 2026-09-04
+
+### Fixed
+
+- Made the real Git fast-forward integration test portable on Windows by using a platform-neutral file URL and normalizing checkout line endings.
+- Upgraded the official checkout and Node setup Actions to their Node.js 24 releases, removing the Node.js 20 deprecation warnings.
+
+### Verified
+
+- The full test matrix passes on both Windows and macOS, including the native macOS application build.
+
 ## 0.7.10 - 2026-09-04
 
 ### Fixed
