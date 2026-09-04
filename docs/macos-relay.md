@@ -10,7 +10,9 @@ Version 0.5 allows either a Windows PC or a Mac to host the local ClipBridge rel
 
 ### Gatekeeper and downloaded source archives
 
-When the project came from a browser download, macOS may attach quarantine metadata to every extracted file. ClipBridge v0.5.1 runs the nested build script through the trusted system `/bin/bash` and ad-hoc signs the locally compiled app, so Gatekeeper does not evaluate `build-app.sh` as a separate application.
+When the project came from a browser download, macOS may attach quarantine metadata to every extracted file. ClipBridge v0.5.2 runs the nested build script through the trusted system `/bin/bash`, removes inherited quarantine only from the generated app bundle, and ad-hoc signs the locally compiled app.
+
+The menu bar app is compiled with Apple's Objective-C/AppKit toolchain. This avoids a failure mode after a partial Command Line Tools update, where `swiftc` and the bundled SDK contain different Swift compiler patch builds and importing AppKit fails even though both report the same public Swift version.
 
 You may still need to right-click `Start-ClipBridge-Mac.command` and choose **Open** the first time. ClipBridge deliberately does not remove quarantine metadata from the downloaded folder.
 - All participating devices on the same trusted private network

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.2 - 2026-09-04
+
+### Fixed
+
+- The native menu bar app now builds with Objective-C/AppKit, avoiding Swift compiler/SDK patch-build mismatches caused by partial Apple Command Line Tools updates.
+- Quarantine metadata inherited by copied resources is removed from the generated app bundle before signing, without changing the downloaded source folder.
+- The generated app now resolves the project root above `dist/` correctly, so it can find and start `src/server.mjs`.
+- The Objective-C app delegate now has process-lifetime ownership, keeping the menu bar relay alive after launch.
+
+### Verified
+
+- Native arm64 build, ad-hoc signature verification, menu bar launch, Node relay startup, and `/health` passed on Mac hardware.
+- All 49 automated tests passed.
+
 ## 0.5.1 - 2026-09-03
 
 ### Fixed

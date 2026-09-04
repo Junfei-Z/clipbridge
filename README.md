@@ -79,7 +79,7 @@ npm install
 ./Start-ClipBridge-Mac.command
 ```
 
-The launcher uses Apple Command Line Tools to build a small native AppKit menu bar app in `dist/ClipBridge.app`. Its menu can open the management panel, copy the LAN device URL, or quit the Mac relay. Clipboard access uses the built-in `pbpaste` and `pbcopy` tools, so Unicode text does not pass through a legacy code page.
+The launcher uses Apple Command Line Tools to build a small native Objective-C/AppKit menu bar app in `dist/ClipBridge.app`. Using clang rather than Swift also keeps the launcher working when a partial Apple tools update leaves the Swift compiler and SDK at different patch builds. Its menu can open the management panel, copy the LAN device URL, or quit the Mac relay. Clipboard access uses the built-in `pbpaste` and `pbcopy` tools, so Unicode text does not pass through a legacy code page.
 
 See [the macOS relay guide](docs/macos-relay.md) for role definitions, requirements, and the hardware-validation boundary.
 
@@ -258,7 +258,7 @@ GET /health
 - **0.3.0:** Local multi-device routing, named destinations, target-isolated inboxes, and a browser/PWA experience for Mac and mobile devices.
 - **0.4.0:** Streamed local file relay, device-scoped file inboxes, safe previews, single-use downloads, quotas, and automatic expiry.
 - **0.4.1:** One-to-many text/file sending, shared Blobs, and independent per-recipient delivery status.
-- **0.5:** Native Mac relay client with explicit management-device and relay-node roles. Implemented; Mac hardware acceptance pending.
+- **0.5:** Native Mac relay client with explicit management-device and relay-node roles. Released and verified on Mac hardware.
 - **0.6:** HTTPS public web entry, installable PWA, and WebRTC online direct transfer.
 - **0.7:** End-to-end encrypted offline relay.
 - **0.8:** Agent Handoff Beta using GitHub project state plus portable Markdown/JSON handoff packages.
