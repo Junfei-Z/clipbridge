@@ -1,5 +1,7 @@
 # ClipBridge Agent Handoff Beta
 
+> **Computer-only:** Agent Handoff requires Git and Node.js on macOS, Windows, or Linux. Phones and tablets can still use ClipBridge text and file transfer, but cannot create or apply repository handoffs.
+
 Agent Handoff moves a repository task between computers without copying a vendor-specific chat session. Git carries committed project history; ClipBridge adds a small, reviewable package for the unfinished work and the context the next agent needs.
 
 ## What is transferred

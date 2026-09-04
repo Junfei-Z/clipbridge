@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.2 - 2026-09-04
+
+### Added
+
+- A desktop management UI for creating, fetching, inspecting, and applying Agent Handoff packages.
+- A clear three-mode navigation for text, files, and Agent Handoff.
+- Explicit computer-only labels on both desktop and paired-device pages; phones and tablets remain text/file endpoints.
+
+### Changed
+
+- The local management interface is split into focused text, file, and Agent workspaces for a shorter, cleaner workflow.
+- Local Agent errors now surface actionable Git or repository details instead of the generic clipboard error.
+
+### Verified
+
+- All 56 automated tests pass, including UI-script parsing and computer-only annotations.
+- The three workspaces and Agent restriction notice were visually checked in the local browser UI.
+
 ## 0.7.1 - 2026-09-04
 
 ### Fixed

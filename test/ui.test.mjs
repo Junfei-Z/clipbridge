@@ -37,6 +37,17 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /剪贴板历史/);
   assert.match(html, /id="local-file-input"/);
   assert.match(html, /局域网文件中转/);
+  assert.match(html, /aria-label="ClipBridge 功能"/);
+  assert.match(html, /id="local-text-mode"/);
+  assert.match(html, /id="local-file-mode"/);
+  assert.match(html, /id="local-agent-mode"/);
+  assert.match(html, /Agent Handoff/);
+  assert.match(html, /电脑专用/);
+  assert.match(html, /手机和平板不能创建或应用代码补丁/);
+  assert.match(html, /id="handoff-repository"/);
+  assert.match(html, /id="handoff-goal"/);
+  assert.match(html, /id="handoff-summary"/);
+  assert.match(html, /id="handoff-next"/);
   assert.match(html, /文件收件箱/);
   assert.match(html, /id="local-file-outbox"/);
   assert.match(html, /共享 Blob · 独立投递/);
@@ -87,6 +98,8 @@ test("renders a real pairing flow plus send and receive modes remotely", () => {
   assert.match(html, /id="inbox-list"/);
   assert.match(html, /id="history-tab"/);
   assert.match(html, /id="file-mode"/);
+  assert.match(html, /Agent · 电脑端/);
+  assert.match(html, /代码项目交接仅能在中转电脑的管理页面使用/);
   assert.match(html, /id="file-input"/);
   assert.match(html, /上传一次，共享给多台设备/);
   assert.match(html, /id="file-outbox"/);

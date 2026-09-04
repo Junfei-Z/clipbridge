@@ -21,7 +21,7 @@ async function git(cwd, args, options = {}) {
       cwd,
       encoding: options.encoding ?? "utf8",
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ...options.env },
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...options.env },
       input: options.input,
     });
     return result.stdout;

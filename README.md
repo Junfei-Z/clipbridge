@@ -6,7 +6,7 @@
 
 <p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
 
-ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. Version 0.7 adds portable Agent Handoff packages for moving unfinished Git work between computers through the user's existing repository.
+ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. Version 0.7 adds portable Agent Handoff packages for moving unfinished Git work between computers through the user's existing repository. Agent Handoff is computer-only: creating and applying patches requires Git and Node.js; phones and tablets remain text/file endpoints.
 
 Version 0.6 also provides an HTTPS PWA at `https://junfei-z.github.io/clipbridge/` for encrypted WebRTC text and file transfer between two online browsers. GitHub Pages serves only the static app; transfer content travels over the peer-to-peer DataChannel.
 
