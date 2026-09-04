@@ -405,7 +405,7 @@ test("serves unified app icons and a token-free installable manifest", async () 
   });
 });
 
-test("reports v0.7.8, relay identity, URLs, and the runtime instance on health", async () => {
+test("reports v0.7.9, relay identity, URLs, and the runtime instance on health", async () => {
   const server = createClipBridgeServer({
     config: { token: LEGACY_TOKEN, deviceName: "Test PC", maxTextBytes: 1024 },
     clipboard: { readText: async () => "", writeText: async () => {} },
@@ -418,7 +418,7 @@ test("reports v0.7.8, relay identity, URLs, and the runtime instance on health",
     assert.deepEqual(await response.json(), {
       ok: true,
       device: "Test PC",
-      version: "0.7.8",
+      version: "0.7.9",
       relayNode: {
         id: "windows-host",
         name: "Test PC",

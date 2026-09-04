@@ -58,7 +58,14 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /id="update-github-project"/);
   assert.match(html, /检查并更新/);
   assert.match(html, /这台电脑还没有这个项目？从 GitHub 拉取/);
-  assert.match(html, /交接对象（可多选/);
+  assert.match(html, /选择接收电脑（可多选/);
+  assert.match(html, /id="agent-send-role"/);
+  assert.match(html, /id="agent-receive-role"/);
+  assert.match(html, /id="agent-send-panel"/);
+  assert.match(html, /id="agent-receive-panel"/);
+  assert.match(html, /发送端/);
+  assert.match(html, /接收端/);
+  assert.match(html, /获取发给我的任务/);
   assert.match(html, /所有有仓库权限的电脑都可以获取这份交接/);
   assert.match(html, /id="handoff-prompt"/);
   assert.match(html, /id="copy-handoff-prompt"/);

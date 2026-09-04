@@ -4,6 +4,8 @@
 
 ## Desktop UI workflow
 
+The Agent component has two explicit roles. Choose **Send handoff** on the computer where work is currently in progress, or **Receive handoff** on the computer that will continue the task. GitHub login, project preparation, environment checks, and computer registration are shared setup above the role selector.
+
 1. Select the local Git project directory. ClipBridge checks Node.js, Git, repository validity, and the GitHub origin automatically.
 2. Copy the official prompt shown in the Agent tab and send it to the Agent currently working on the project.
 3. Paste the Agent's complete structured response into the single response field.

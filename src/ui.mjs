@@ -129,6 +129,13 @@ export function renderDashboard({
     .github-account-copy { flex: 1; min-width: 0; }
     .github-account-copy strong, .github-account-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .github-account-copy span { margin-top: 2px; color: #7b8497; font-size: 11px; }
+    .agent-role-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 6px 0 2px; }
+    .agent-role-tab { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; padding: 14px; color: #59647a; border: 1px solid #e5e8ef; background: #fafbfc; text-align: left; }
+    .agent-role-tab[aria-selected="true"] { color: #fff; border-color: transparent; background: linear-gradient(135deg, #7546f5, #4d35e8); box-shadow: 0 8px 18px #5f35f229; }
+    .agent-role-icon { font-size: 24px; line-height: 1; }
+    .agent-role-tab strong, .agent-role-tab small { display: block; }
+    .agent-role-tab small { margin-top: 3px; opacity: .78; font-size: 11px; font-weight: 500; }
+    .agent-role-intro { display: flex; align-items: center; gap: 9px; margin: 4px 0 13px; color: #657086; font-size: 12px; }
     .compact-area { min-height: 88px; font-family: inherit; font-size: 14px; }
     .handoff-list { display: grid; gap: 9px; margin-top: 16px; }
     .handoff-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid #eceef3; border-radius: 14px; background: #fafbfc; }
@@ -186,6 +193,7 @@ export function renderDashboard({
       .pair-route span { width: 7px; height: 7px; border-radius: 50%; background: #20b26b; }
       .form-grid { grid-template-columns: 1fr; }
       .environment-bar { grid-template-columns: 1fr 1fr; }
+      .agent-role-tabs { grid-template-columns: 1fr; }
       .destination { grid-template-columns: 1fr; }
       .form-grid .full { grid-column: auto; }
       .pair-box { grid-template-columns: 1fr; text-align: center; }
@@ -452,9 +460,15 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
             <div class="actions"><button class="primary" id="clone-github-project">拉取项目并使用</button><button class="secondary" id="copy-github-login" hidden>复制 GitHub 登录命令</button></div>
             <p class="helper">项目会保存到“固定目录/仓库名”。私有仓库需要这台电脑已经配置 GitHub 凭据。</p>
           </div></details>
-          <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
+          <label>当前 Git 项目<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
           <div class="actions"><button class="secondary" id="choose-project-directory">选择已有项目文件夹</button><button class="secondary" id="update-github-project">检查并更新</button><button class="secondary" id="register-agent-computer">登记当前电脑</button><button class="quiet" id="refresh-agent-computers">刷新 Agent 电脑</button></div>
-          <div class="target-block"><div class="target-label">交接对象（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
+          <nav class="agent-role-tabs" role="tablist" aria-label="Agent Handoff 角色">
+            <button class="agent-role-tab" id="agent-send-role" role="tab" aria-selected="true" aria-controls="agent-send-panel"><span class="agent-role-icon" aria-hidden="true">↗</span><span><strong>发送交接</strong><small>我在这台电脑完成了一部分工作</small></span></button>
+            <button class="agent-role-tab" id="agent-receive-role" role="tab" aria-selected="false" aria-controls="agent-receive-panel"><span class="agent-role-icon" aria-hidden="true">↙</span><span><strong>接收交接</strong><small>我要在这台电脑继续工作</small></span></button>
+          </nav>
+          <section id="agent-send-panel" role="tabpanel" aria-labelledby="agent-send-role">
+          <div class="agent-role-intro"><span class="role-pill">发送端</span><span>选择接手电脑，整理当前 Agent 的上下文，然后发布。</span></div>
+          <div class="target-block"><div class="target-label">1. 选择接收电脑（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
           <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
 
 CLIPBRIDGE_HANDOFF_V1
@@ -467,11 +481,16 @@ CLIPBRIDGE_HANDOFF_V1
 END_CLIPBRIDGE_HANDOFF</textarea></label>
           <div class="actions"><button class="secondary" id="copy-handoff-prompt">复制官方 Prompt</button></div>
           <label>3. 粘贴 Agent 的完整回复<textarea id="handoff-response" placeholder="把 Agent 按照上面格式生成的完整回复粘贴到这里…"></textarea></label>
+          <div class="actions"><button class="primary" id="create-handoff">4. 发布交接到此仓库</button></div>
+          </section>
+          <section id="agent-receive-panel" role="tabpanel" aria-labelledby="agent-receive-role" hidden>
+            <div class="agent-role-intro"><span class="role-pill">接收端</span><span>获取发给这台电脑的任务，确认内容后再应用到本地项目。</span></div>
+            <div class="actions"><button class="primary" id="refresh-handoffs">1. 获取发给我的任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
+            <div class="handoff-list" id="handoff-list"><div class="empty">点击“获取发给我的任务”开始接收。</div></div>
+            <pre class="handoff-preview" id="handoff-preview" hidden></pre>
+          </section>
         </div>
-        <div class="actions"><button class="primary" id="create-handoff">4. 发布交接到此仓库</button><button class="secondary" id="refresh-handoffs">获取待接手任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
         <div class="message" id="handoff-message" role="status" aria-live="polite"></div>
-        <div class="handoff-list" id="handoff-list"><div class="empty">输入 Git 项目目录，然后获取待接手任务。</div></div>
-        <pre class="handoff-preview" id="handoff-preview" hidden></pre>
       </section>
     </div>
     <section class="card" aria-labelledby="devices-title">
@@ -640,6 +659,10 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const handoffMessage = document.querySelector('#handoff-message');
     const createHandoffButton = document.querySelector('#create-handoff');
     const refreshHandoffsButton = document.querySelector('#refresh-handoffs');
+    const agentSendRole = document.querySelector('#agent-send-role');
+    const agentReceiveRole = document.querySelector('#agent-receive-role');
+    const agentSendPanel = document.querySelector('#agent-send-panel');
+    const agentReceivePanel = document.querySelector('#agent-receive-panel');
     const historyShow = (text, error = false) => { historyMessage.textContent = text; historyMessage.style.color = error ? '#d14343' : ''; };
     const localFileShow = (text, error = false) => { localFileMessage.textContent = text; localFileMessage.style.color = error ? '#d14343' : ''; };
     let currentPairUrl = '';
@@ -658,6 +681,14 @@ function localModeScript({ fileLimitLabel, relayNode }) {
       document.querySelector('#handoff-connection-detail').textContent = count
         ? currentHandoffRemote + ' · 已定向选择 ' + count + ' 台 Agent 电脑。'
         : currentHandoffRemote + ' · 未选择设备，将发布给此仓库内全部 Agent 电脑。';
+    }
+
+    function activateAgentRole(role) {
+      const sending = role === 'send';
+      agentSendRole.setAttribute('aria-selected', String(sending));
+      agentReceiveRole.setAttribute('aria-selected', String(!sending));
+      agentSendPanel.hidden = !sending; agentReceivePanel.hidden = sending;
+      handoffPreview.hidden = true; handoffShow('');
     }
 
     async function checkHandoffEnvironment() {
@@ -798,7 +829,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         for (const handoff of data.handoffs) {
           const item = document.createElement('article'); item.className = 'handoff-item';
           const copy = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
-          title.textContent = handoff.id; meta.textContent = handoff.date ? new Date(handoff.date).toLocaleString() : handoff.ref; copy.append(title, meta);
+          title.textContent = handoff.goal || handoff.id; meta.textContent = (handoff.sender?.name ? '来自 ' + handoff.sender.name + ' · ' : '') + (handoff.date ? new Date(handoff.date).toLocaleString() : handoff.ref); copy.append(title, meta);
           const actions = document.createElement('div'); actions.className = 'actions'; actions.style.marginTop = '0';
           const inspect = document.createElement('button'); inspect.className = 'quiet'; inspect.textContent = '预览'; inspect.onclick = () => inspectHandoffFromUi(handoff.id);
           const apply = document.createElement('button'); apply.className = 'secondary'; apply.textContent = '接手'; apply.onclick = () => applyHandoffFromUi(handoff.id);
@@ -828,11 +859,13 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     updateGithubProjectButton.addEventListener('click', updateExistingProject);
     handoffRepository.addEventListener('input', () => { clearTimeout(environmentTimer); environmentTimer = setTimeout(checkHandoffEnvironment, 450); });
     refreshHandoffsButton.addEventListener('click', () => refreshHandoffs(true));
+    agentSendRole.addEventListener('click', () => activateAgentRole('send'));
+    agentReceiveRole.addEventListener('click', () => activateAgentRole('receive'));
     createHandoffButton.addEventListener('click', async () => {
       createHandoffButton.disabled = true; handoffShow('正在创建并推送安全交接包…');
       try {
         const data = await apiJson('/api/v1/handoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.', agentResponse: handoffResponse.value, targetIds: selectedTargetIds(handoffTargets), push: true }) });
-        handoffShow('已推送交接：' + data.id); await refreshHandoffs(false);
+        handoffShow('交接已发布。接收电脑现在可以获取任务：' + data.id);
       } catch (error) { handoffShow(error.message, true); }
       finally { createHandoffButton.disabled = false; }
     });

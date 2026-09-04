@@ -345,13 +345,14 @@ export async function listHandoffs(options = {}) {
     return { id, ref, date };
   });
   const unique = [...new Map(found.map((item) => [item.id, item])).values()];
-  if (!options.recipientId) return unique;
   const visible = [];
   for (const item of unique) {
     try {
       const ref = item.ref.startsWith("origin/") ? `refs/remotes/${item.ref}` : `refs/heads/${item.ref}`;
       const state = JSON.parse(await git(repo.root, ["show", `${ref}:.clipbridge/handoffs/${item.id}/state.json`]));
-      if (state.delivery?.mode !== "targeted" || state.delivery.targetIds?.includes(options.recipientId)) visible.push(item);
+      if (!options.recipientId || state.delivery?.mode !== "targeted" || state.delivery.targetIds?.includes(options.recipientId)) {
+        visible.push({ ...item, goal: state.goal, sender: state.delivery?.sender || state.source, delivery: state.delivery });
+      }
     } catch { visible.push(item); }
   }
   return visible;

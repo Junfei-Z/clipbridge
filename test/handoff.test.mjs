@@ -91,8 +91,11 @@ test("registers Agent computers without modifying the active project branch", as
 test("filters targeted handoffs for the receiving Agent computer", async () => {
   const root = await repository();
   await writeFile(join(root, "work.txt"), "targeted change\n", "utf8");
-  await createHandoff({ cwd: root, id: "targeted-test", targetIds: ["windows-work"] });
-  assert.equal((await listHandoffs({ cwd: root, recipientId: "windows-work" })).length, 1);
+  await createHandoff({ cwd: root, id: "targeted-test", goal: "Continue on Windows", targetIds: ["windows-work"], sourceAgent: { id: "mac-studio", name: "Mac Studio", type: "mac" } });
+  const windowsTasks = await listHandoffs({ cwd: root, recipientId: "windows-work" });
+  assert.equal(windowsTasks.length, 1);
+  assert.equal(windowsTasks[0].goal, "Continue on Windows");
+  assert.equal(windowsTasks[0].sender.name, "Mac Studio");
   assert.equal((await listHandoffs({ cwd: root, recipientId: "mac-studio" })).length, 0);
   assert.deepEqual((await inspectHandoff("targeted-test", { cwd: root })).state.delivery.targetIds, ["windows-work"]);
 });

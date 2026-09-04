@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.9 - 2026-09-04
+
+### Changed
+
+- Split the Agent Handoff component into explicit **Send handoff** and **Receive handoff** roles with large, persistent role selectors.
+- Shared GitHub account, project preparation, environment, and computer registration stay above the role switch; each role shows only the actions it needs.
+- Receiving task cards now show the handoff goal and sending computer name instead of leading with an opaque package id.
+- Publishing keeps the sender in the send flow and presents a clear completion message.
+
+### Verified
+
+- Browser interaction confirms that send and receive panels are mutually exclusive and retain correct ARIA selection state.
+- All automated tests pass and the native macOS app builds successfully.
+
 ## 0.7.8 - 2026-09-04
 
 ### Changed
