@@ -47,6 +47,9 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /id="handoff-repository"/);
   assert.match(html, /id="handoff-environment"/);
   assert.match(html, /id="handoff-connection"/);
+  assert.match(html, /id="register-agent-computer"/);
+  assert.match(html, /id="handoff-targets"/);
+  assert.match(html, /交接对象（可多选/);
   assert.match(html, /所有有仓库权限的电脑都可以获取这份交接/);
   assert.match(html, /id="handoff-prompt"/);
   assert.match(html, /id="copy-handoff-prompt"/);

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.5 - 2026-09-04
+
+### Added
+
+- Repository-backed Agent computer registration with stable ClipBridge node identities and human-readable device names.
+- Discovery of Agent-capable computers through dedicated GitHub branches without touching the active project branch or working tree.
+- One-device, multi-device, or all-computer delivery selection in the Agent Handoff UI.
+- Targeted handoff metadata and receiver-side filtering so unrelated Agent computers do not see directed tasks.
+
+### Verified
+
+- Three simulated computers discovered one another and the sender selected a Windows target by name.
+- Registration preserves the active branch and clean working tree; targeted handoffs are visible only to selected recipients.
+- All 60 automated tests pass and the native macOS app builds successfully.
+
 ## 0.7.4 - 2026-09-04
 
 ### Changed

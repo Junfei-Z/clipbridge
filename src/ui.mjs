@@ -437,6 +437,8 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
         <div class="handoff-connection" id="handoff-connection" data-online="false"><span class="dot" aria-hidden="true"></span><span><strong id="handoff-connection-title">尚未连接交接仓库</strong><span id="handoff-connection-detail">选择有效的 GitHub 项目后，所有有仓库权限的电脑都可以获取这份交接。</span></span></div>
         <div class="agent-grid">
           <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
+          <div class="actions"><button class="secondary" id="register-agent-computer">登记当前电脑</button><button class="quiet" id="refresh-agent-computers">刷新 Agent 电脑</button></div>
+          <div class="target-block"><div class="target-label">交接对象（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
           <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
 
 CLIPBRIDGE_HANDOFF_V1
@@ -606,6 +608,9 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const handoffConnection = document.querySelector('#handoff-connection');
     const handoffPrompt = document.querySelector('#handoff-prompt');
     const handoffResponse = document.querySelector('#handoff-response');
+    const handoffTargets = document.querySelector('#handoff-targets');
+    const registerAgentComputerButton = document.querySelector('#register-agent-computer');
+    const refreshAgentComputersButton = document.querySelector('#refresh-agent-computers');
     const handoffList = document.querySelector('#handoff-list');
     const handoffPreview = document.querySelector('#handoff-preview');
     const handoffMessage = document.querySelector('#handoff-message');
@@ -617,9 +622,18 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     let pairingPoll = null;
     let localUpload = null;
     let environmentTimer = null;
+    let currentHandoffRemote = '';
 
     const handoffShow = (text, error = false) => { handoffMessage.textContent = text; handoffMessage.style.color = error ? '#d14343' : ''; };
     const repositoryQuery = () => '?repository=' + encodeURIComponent(handoffRepository.value.trim() || '.');
+
+    function updateHandoffDeliveryLabel() {
+      if (!currentHandoffRemote) return;
+      const count = selectedTargetIds(handoffTargets).length;
+      document.querySelector('#handoff-connection-detail').textContent = count
+        ? currentHandoffRemote + ' · 已定向选择 ' + count + ' 台 Agent 电脑。'
+        : currentHandoffRemote + ' · 未选择设备，将发布给此仓库内全部 Agent 电脑。';
+    }
 
     async function checkHandoffEnvironment() {
       try {
@@ -633,12 +647,39 @@ function localModeScript({ fileLimitLabel, relayNode }) {
           item.title = status.detail;
         }
         const connected = data.repository.ok && data.github.ok;
+        currentHandoffRemote = connected ? data.github.detail : '';
         handoffConnection.dataset.online = String(connected);
         document.querySelector('#handoff-connection-title').textContent = connected ? '已连接 GitHub 交接仓库' : '尚未连接交接仓库';
         document.querySelector('#handoff-connection-detail').textContent = connected
-          ? data.github.detail + ' · 所有有权限的电脑均可获取，当前不是定向发送。'
+          ? data.github.detail + ' · 未选择设备，将发布给此仓库内全部 Agent 电脑。'
           : '请选择带有 GitHub origin 的 Git 项目；这不是与某台电脑的直接在线连接。';
+        if (connected) await refreshAgentComputers(false);
       } catch (error) { handoffShow(error.message, true); }
+    }
+
+    async function refreshAgentComputers(fetchRemote = true) {
+      refreshAgentComputersButton.disabled = true;
+      try {
+        const data = await apiJson('/api/v1/agent-computers' + repositoryQuery() + (fetchRemote ? '&fetch=1' : ''));
+        const selected = selectedTargetIds(handoffTargets);
+        const targets = data.computers.filter((computer) => computer.id !== data.selfId);
+        renderTargetPicker(handoffTargets, targets, selected);
+        updateHandoffDeliveryLabel();
+        if (!targets.length) {
+          const empty = handoffTargets.querySelector('.empty');
+          if (empty) empty.textContent = '还没有其他 Agent 电脑。请在另一台电脑打开同一仓库并点击“登记当前电脑”。';
+        }
+      } catch (error) { handoffTargets.replaceChildren(); handoffShow(error.message, true); }
+      finally { refreshAgentComputersButton.disabled = false; }
+    }
+
+    async function registerCurrentAgentComputer() {
+      registerAgentComputerButton.disabled = true; handoffShow('正在把当前电脑登记到此 GitHub 仓库…');
+      try {
+        const data = await apiJson('/api/v1/agent-computers/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.' }) });
+        handoffShow('已登记 Agent 电脑：' + data.name); await refreshAgentComputers(true);
+      } catch (error) { handoffShow(error.message, true); }
+      finally { registerAgentComputerButton.disabled = false; }
     }
 
     function activateLocalMode(name) {
@@ -695,12 +736,15 @@ function localModeScript({ fileLimitLabel, relayNode }) {
       handoffShow(copied ? '官方 Prompt 已复制，请发给当前 Agent。' : '已选中 Prompt，请手动复制。');
     });
     document.querySelector('#check-handoff-environment').addEventListener('click', checkHandoffEnvironment);
+    registerAgentComputerButton.addEventListener('click', registerCurrentAgentComputer);
+    refreshAgentComputersButton.addEventListener('click', () => refreshAgentComputers(true));
+    handoffTargets.addEventListener('targetschange', updateHandoffDeliveryLabel);
     handoffRepository.addEventListener('input', () => { clearTimeout(environmentTimer); environmentTimer = setTimeout(checkHandoffEnvironment, 450); });
     refreshHandoffsButton.addEventListener('click', () => refreshHandoffs(true));
     createHandoffButton.addEventListener('click', async () => {
       createHandoffButton.disabled = true; handoffShow('正在创建并推送安全交接包…');
       try {
-        const data = await apiJson('/api/v1/handoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.', agentResponse: handoffResponse.value, push: true }) });
+        const data = await apiJson('/api/v1/handoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.', agentResponse: handoffResponse.value, targetIds: selectedTargetIds(handoffTargets), push: true }) });
         handoffShow('已推送交接：' + data.id); await refreshHandoffs(false);
       } catch (error) { handoffShow(error.message, true); }
       finally { createHandoffButton.disabled = false; }

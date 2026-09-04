@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const REF_PREFIX = "clipbridge/handoff/";
+const AGENT_REF_PREFIX = "clipbridge/agent/";
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\bghp_[A-Za-z0-9]{20,}\b/,
@@ -53,6 +54,12 @@ function redactRemote(value) {
 
 function changedPaths(status) {
   return status.split("\0").filter(Boolean).map((entry) => entry.slice(3)).filter((path) => !path.startsWith(".clipbridge/"));
+}
+
+function safeDeviceId(value) {
+  const id = String(value || "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/.test(id)) throw new Error("Agent computer id is invalid");
+  return id;
 }
 
 export function findSensitivePatch(patch) {
@@ -145,6 +152,11 @@ export async function createHandoff(options = {}) {
     createdAt,
     repository: { name: basename(repo.root), remote: repo.remote, baseCommit: repo.baseCommit, sourceBranch: repo.currentBranch },
     source: { hostname: hostname(), platform: platform() },
+    delivery: {
+      sender: options.sourceAgent || null,
+      targetIds: Array.isArray(options.targetIds) ? [...new Set(options.targetIds.map(safeDeviceId))] : [],
+      mode: Array.isArray(options.targetIds) && options.targetIds.length ? "targeted" : "repository",
+    },
     handoffBranch: branch,
     goal: cleanText(options.goal, "Continue the current repository task"),
     summary: cleanText(options.summary, "See the patch and repository history."),
@@ -181,6 +193,62 @@ export async function createHandoff(options = {}) {
   }
 }
 
+export async function registerAgentComputer(options = {}) {
+  const repo = await repositoryInfo(options.cwd || process.cwd());
+  const id = safeDeviceId(options.id);
+  const registeredAt = new Date().toISOString();
+  const profile = {
+    schema: "dev.clipbridge.agent-computer/v1",
+    id,
+    name: cleanText(options.name, hostname()),
+    type: cleanText(options.type, platform()),
+    platform: cleanText(options.platform, platform()),
+    registeredAt,
+    repository: { name: basename(repo.root), remote: repo.remote },
+  };
+  const temp = await mkdtemp(join(tmpdir(), "clipbridge-agent-profile-"));
+  try {
+    const manifest = join(temp, `${id}.json`);
+    await writeFile(manifest, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
+    const index = join(temp, "index");
+    const env = { GIT_INDEX_FILE: index };
+    await git(repo.root, ["read-tree", "--empty"], { env });
+    const blob = (await git(repo.root, ["hash-object", "-w", manifest])).trim();
+    await git(repo.root, ["update-index", "--add", "--cacheinfo", `100644,${blob},.clipbridge/agents/${id}.json`], { env });
+    const tree = (await git(repo.root, ["write-tree"], { env })).trim();
+    const identity = {
+      GIT_AUTHOR_NAME: "ClipBridge Agent Registry",
+      GIT_AUTHOR_EMAIL: "handoff@clipbridge.local",
+      GIT_COMMITTER_NAME: "ClipBridge Agent Registry",
+      GIT_COMMITTER_EMAIL: "handoff@clipbridge.local",
+    };
+    const commit = (await git(repo.root, ["commit-tree", tree, "-m", `Register Agent computer ${profile.name}`], { env: identity })).trim();
+    const branch = `${AGENT_REF_PREFIX}${id}`;
+    await git(repo.root, ["update-ref", `refs/heads/${branch}`, commit]);
+    if (options.push !== false) await git(repo.root, ["push", "--force", "origin", `refs/heads/${branch}:refs/heads/${branch}`]);
+    return { ...profile, branch, commit, pushed: options.push !== false };
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+}
+
+export async function listAgentComputers(options = {}) {
+  const repo = await repositoryInfo(options.cwd || process.cwd());
+  if (options.fetch) await git(repo.root, ["fetch", "origin", `+refs/heads/${AGENT_REF_PREFIX}*:refs/remotes/origin/${AGENT_REF_PREFIX}*`]);
+  const output = await git(repo.root, ["for-each-ref", "--format=%(refname)", `refs/heads/${AGENT_REF_PREFIX}`, `refs/remotes/origin/${AGENT_REF_PREFIX}`]);
+  const profiles = [];
+  const seen = new Set();
+  for (const fullRef of output.trim().split("\n").filter(Boolean)) {
+    const id = fullRef.slice(fullRef.indexOf(AGENT_REF_PREFIX) + AGENT_REF_PREFIX.length);
+    if (seen.has(id)) continue;
+    try {
+      const profile = JSON.parse(await git(repo.root, ["show", `${fullRef}:.clipbridge/agents/${id}.json`]));
+      seen.add(id); profiles.push({ ...profile, ref: fullRef });
+    } catch {}
+  }
+  return profiles.sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export async function listHandoffs(options = {}) {
   const repo = await repositoryInfo(options.cwd || process.cwd());
   if (options.fetch) await git(repo.root, ["fetch", "origin", `+refs/heads/${REF_PREFIX}*:refs/remotes/origin/${REF_PREFIX}*`]);
@@ -190,7 +258,17 @@ export async function listHandoffs(options = {}) {
     const id = ref.slice(ref.indexOf(REF_PREFIX) + REF_PREFIX.length);
     return { id, ref, date };
   });
-  return [...new Map(found.map((item) => [item.id, item])).values()];
+  const unique = [...new Map(found.map((item) => [item.id, item])).values()];
+  if (!options.recipientId) return unique;
+  const visible = [];
+  for (const item of unique) {
+    try {
+      const ref = item.ref.startsWith("origin/") ? `refs/remotes/${item.ref}` : `refs/heads/${item.ref}`;
+      const state = JSON.parse(await git(repo.root, ["show", `${ref}:.clipbridge/handoffs/${item.id}/state.json`]));
+      if (state.delivery?.mode !== "targeted" || state.delivery.targetIds?.includes(options.recipientId)) visible.push(item);
+    } catch { visible.push(item); }
+  }
+  return visible;
 }
 
 async function resolveHandoff(repo, id) {

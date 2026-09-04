@@ -5,7 +5,7 @@ import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
-import { applyHandoff, createHandoff, handoffEnvironment, inspectHandoff, listHandoffs, parseAgentHandoffResponse } from "./handoff.mjs";
+import { applyHandoff, createHandoff, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "./handoff.mjs";
 import { isRelayTargetId, managementSession, relayNodeIdentity } from "./identity.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -13,7 +13,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.7.4";
+const APP_VERSION = "0.7.5";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -329,8 +329,30 @@ export function createClipBridgeServer({
         }
         const repository = requestUrl.searchParams.get("repository") || process.cwd();
         const fetchRemote = requestUrl.searchParams.get("fetch") === "1";
-        const handoffs = await listHandoffs({ cwd: repository, fetch: fetchRemote });
+        const handoffs = await listHandoffs({ cwd: repository, fetch: fetchRemote, recipientId: config.nodeId });
         json(response, 200, { repository, handoffs });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/agent-computers" && request.method === "GET") {
+        if (!isLocal) {
+          json(response, 403, { error: "Agent 电脑列表只能在中转电脑上读取。" });
+          return;
+        }
+        const repository = requestUrl.searchParams.get("repository") || process.cwd();
+        const computers = await listAgentComputers({ cwd: repository, fetch: requestUrl.searchParams.get("fetch") === "1" });
+        json(response, 200, { selfId: config.nodeId, computers });
+        return;
+      }
+
+      if (requestUrl.pathname === "/api/v1/agent-computers/register" && request.method === "POST") {
+        if (!isLocal) {
+          json(response, 403, { error: "只能在当前中转电脑上登记 Agent 身份。" });
+          return;
+        }
+        const body = await readJson(request, 64 * 1024);
+        const computer = await registerAgentComputer({ cwd: body.repository || process.cwd(), id: config.nodeId, name: config.nodeName, type: config.nodeType, platform: config.nodePlatform, push: true });
+        json(response, 201, computer);
         return;
       }
 
@@ -356,6 +378,8 @@ export function createClipBridgeServer({
           goal: context.goal,
           summary: context.summary,
           next: context.next,
+          targetIds: body.targetIds,
+          sourceAgent: { id: config.nodeId, name: config.nodeName, type: config.nodeType },
           push: body.push !== false
         });
         json(response, 201, result);

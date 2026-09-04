@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { applyHandoff, createHandoff, findSensitivePatch, handoffEnvironment, inspectHandoff, listHandoffs, parseAgentHandoffResponse } from "../src/handoff.mjs";
+import { applyHandoff, createHandoff, findSensitivePatch, handoffEnvironment, inspectHandoff, listAgentComputers, listHandoffs, parseAgentHandoffResponse, registerAgentComputer } from "../src/handoff.mjs";
 
 const exec = promisify(execFile);
 const git = (cwd, args) => exec("git", args, { cwd, encoding: "utf8" });
@@ -76,4 +76,23 @@ test("reports Node, Git, repository, and GitHub remote readiness", async () => {
   assert.equal(status.git.ok, true);
   assert.equal(status.repository.ok, true);
   assert.equal(status.github.ok, true);
+});
+
+test("registers Agent computers without modifying the active project branch", async () => {
+  const root = await repository();
+  await registerAgentComputer({ cwd: root, id: "mac-studio", name: "Mac Studio", type: "mac", platform: "darwin", push: false });
+  await registerAgentComputer({ cwd: root, id: "windows-work", name: "Windows 工作站", type: "windows", platform: "win32", push: false });
+  const computers = await listAgentComputers({ cwd: root });
+  assert.deepEqual(computers.map(({ id }) => id), ["mac-studio", "windows-work"]);
+  assert.equal((await git(root, ["branch", "--show-current"])).stdout.trim(), "main");
+  assert.equal((await git(root, ["status", "--porcelain"])).stdout, "");
+});
+
+test("filters targeted handoffs for the receiving Agent computer", async () => {
+  const root = await repository();
+  await writeFile(join(root, "work.txt"), "targeted change\n", "utf8");
+  await createHandoff({ cwd: root, id: "targeted-test", targetIds: ["windows-work"] });
+  assert.equal((await listHandoffs({ cwd: root, recipientId: "windows-work" })).length, 1);
+  assert.equal((await listHandoffs({ cwd: root, recipientId: "mac-studio" })).length, 0);
+  assert.deepEqual((await inspectHandoff("targeted-test", { cwd: root })).state.delivery.targetIds, ["windows-work"]);
 });
