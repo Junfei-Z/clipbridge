@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0 - 2026-09-04
+
+### Added
+
+- Agent Handoff Beta with portable `HANDOFF.md`, `state.json`, and SHA-256-verified binary Git patch packages.
+- Separate `clipbridge/handoff/<id>` branches that preserve the sender's current branch, index, and working tree.
+- `create`, `list --fetch`, `inspect`, and clean-tree `apply` commands for cross-device Git repository handoff.
+- File-based goal, summary, and next-action inputs so an agent can provide structured context without shell-length limits.
+- Credential-pattern blocking and default omission of all untracked files, raw sessions, environment variables, and clipboard data.
+
+### Changed
+
+- Agent Handoff moves forward from the former 0.8 roadmap slot to 0.7. The experimental 0.6 WebRTC interface remains published, but active feature development is paused.
+
+### Verified
+
+- A real temporary source repository produced a handoff without changing its active branch or dirty working tree.
+- A separate clean clone fetched, inspected, checksum-verified, and applied a Unicode patch successfully.
+- All 56 automated tests pass, and the native macOS app still builds and signs successfully.
+
 ## 0.6.2 - 2026-09-04
 
 ### Added

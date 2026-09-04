@@ -6,11 +6,13 @@
 
 <p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
 
-ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. It requires no cloud account and does not upload content to a third-party service.
+ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. Version 0.7 adds portable Agent Handoff packages for moving unfinished Git work between computers through the user's existing repository.
 
 Version 0.6 also provides an HTTPS PWA at `https://junfei-z.github.io/clipbridge/` for encrypted WebRTC text and file transfer between two online browsers. GitHub Pages serves only the static app; transfer content travels over the peer-to-peer DataChannel.
 
 ## Online WebRTC transfer in 0.6
+
+The 0.6 public WebRTC interface remains available as an experimental feature, but it is no longer the primary product direction. Persistent local-device workflows remain the default.
 
 1. Open `https://junfei-z.github.io/clipbridge/` on both devices.
 2. On one device choose **创建连接** to get a temporary 6-digit room code and QR code.
@@ -270,9 +272,9 @@ GET /health
 - **0.4.0:** Streamed local file relay, device-scoped file inboxes, safe previews, single-use downloads, quotas, and automatic expiry.
 - **0.4.1:** One-to-many text/file sending, shared Blobs, and independent per-recipient delivery status.
 - **0.5:** Native Mac relay client with explicit management-device and relay-node roles. Released and verified on Mac hardware.
-- **0.6:** HTTPS public web entry, installable PWA, and WebRTC online direct transfer. Released in 0.6.0.
-- **0.7:** End-to-end encrypted offline relay.
-- **0.8:** Agent Handoff Beta using GitHub project state plus portable Markdown/JSON handoff packages.
+- **0.6:** Experimental HTTPS PWA and WebRTC online direct transfer. Released; feature development paused after usability evaluation.
+- **0.7:** Agent Handoff Beta using Git project state plus portable Markdown/JSON/patch packages. See [the Agent Handoff guide](docs/agent-handoff.md).
+- **Later:** End-to-end encrypted offline relay, revisited only when a concrete workflow requires it.
 
 ## Development
 

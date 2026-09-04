@@ -1,8 +1,8 @@
 {
   "name": "clipbridge",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "private": true,
-  "description": "A local-first relay and WebRTC peer-to-peer text and file bridge.",
+  "description": "A local-first device relay with portable Git-based Agent Handoff packages.",
   "type": "module",
   "scripts": {
     "start": "node src/server.mjs",
@@ -10,6 +10,7 @@
     "test": "node --test",
     "build:mac": "bash macos/build-app.sh",
     "build:web": "node scripts/build-web.mjs",
+    "handoff": "node scripts/clipbridge-handoff.mjs",
     "signal:dev": "wrangler dev --config worker/wrangler.jsonc --port 8787",
     "signal:check": "wrangler deploy --config worker/wrangler.jsonc --dry-run",
     "signal:deploy": "wrangler deploy --config worker/wrangler.jsonc"
