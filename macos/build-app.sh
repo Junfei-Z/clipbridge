@@ -17,6 +17,7 @@ xcrun clang -fobjc-arc "$SCRIPT_DIR/ClipBridgeClipboard.m" \
   -o "$CONTENTS/Resources/clipbridge-clipboard"
 cp "$SCRIPT_DIR/Info.plist" "$CONTENTS/Info.plist"
 cp "$PROJECT_ROOT/assets/brand-icon-96.png" "$CONTENTS/Resources/brand-icon-96.png"
+cp "$PROJECT_ROOT/assets/ClipBridge.icns" "$CONTENTS/Resources/ClipBridge.icns"
 command -v node > "$CONTENTS/Resources/node-path"
 chmod +x "$CONTENTS/MacOS/ClipBridge"
 chmod +x "$CONTENTS/Resources/clipbridge-clipboard"

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.8 - 2026-09-04
+
+### Changed
+
+- Redesigned the ClipBridge mascot for 16–48 px clarity while preserving the cute purple-blue clipboard robot and bridge identity.
+- Replaced fragile bridge railings with one bold outlined arch, enlarged the eyes, simplified the top clip, and added a continuous dark-indigo silhouette keyline.
+- Rebuilt the web, PWA, favicon, Windows tray, and macOS application icon assets from one transparent high-resolution master.
+
+### Added
+
+- A reproducible macOS icon build script that produces optimized PNG sizes, multi-resolution ICO files, and a complete ICNS bundle.
+- A real `CFBundleIconFile` entry for the native macOS application.
+
+### Verified
+
+- The mascot remains recognizable at 16 px and preserves both the eyes and bridge at 32 px.
+- All automated tests pass and the native macOS application builds and signs with the new ICNS resource.
+
 ## 0.7.7 - 2026-09-04
 
 ### Added
