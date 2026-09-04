@@ -1,13 +1,14 @@
 {
   "name": "clipbridge",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "private": true,
-  "description": "A lightweight, local-first text and file bridge with Windows or Mac relay nodes.",
+  "description": "A local-first relay and WebRTC peer-to-peer text and file bridge.",
   "type": "module",
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test",
-    "build:mac": "bash macos/build-app.sh"
+    "build:mac": "bash macos/build-app.sh",
+    "build:web": "node scripts/build-web.mjs"
   },
   "engines": {
     "node": ">=20"

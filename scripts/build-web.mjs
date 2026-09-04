@@ -1,0 +1,2 @@
+import { cp, mkdir, rm } from "node:fs/promises";
+const output=new URL("../dist/web/",import.meta.url);await rm(output,{recursive:true,force:true});await mkdir(output,{recursive:true});await cp(new URL("../web/",import.meta.url),output,{recursive:true});await mkdir(new URL("assets/",output));for(const name of ["brand-icon-96.png","icon-192.png","icon-512.png","apple-touch-icon.png","favicon.ico"]){await cp(new URL(`../assets/${name}`,import.meta.url),new URL(`assets/${name}`,output))}await cp(new URL("index.html",output),new URL("404.html",output));

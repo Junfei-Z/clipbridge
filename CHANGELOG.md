@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 - 2026-09-04
+
+### Added
+
+- A public, subpath-safe PWA for `junfei-z.github.io/clipbridge` with an installable manifest, responsive UI, and offline application shell.
+- Backend-free WebRTC offer/answer pairing through one-time connection codes.
+- Encrypted peer-to-peer DataChannel transfer for Unicode text and arbitrary files.
+- 48 KiB file chunking, sender backpressure, progress reporting, and SHA-256 receiver verification.
+- A GitHub Pages deployment workflow and reproducible static-site build.
+
+### Privacy
+
+- GitHub Pages serves only static application assets and never receives transferred text or files.
+- Connection codes contain ephemeral WebRTC negotiation metadata and should be shared only with the intended peer.
+- Received content is held only by the current page and is cleared when the page is refreshed.
+
+### Verified
+
+- Two independent browser pages completed WebRTC negotiation and transferred Unicode text.
+- A Unicode test file passed chunked transfer and SHA-256 verification with no browser console errors.
+- All 52 automated tests passed before release.
+
 ## 0.5.3 - 2026-09-04
 
 ### Fixed

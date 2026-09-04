@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#6738f4">
+  <meta name="description" content="ClipBridge WebRTC 点对点文字与文件直传">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/favicon.ico">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <title>ClipBridge · 在线直传</title>
+</head>
+<body>
+  <main class="shell">
+    <header><img src="./assets/brand-icon-96.png" alt=""><div><h1>ClipBridge</h1><p>在线点对点直传</p></div><span id="status" class="status">未连接</span></header>
+
+    <section class="hero">
+      <span class="eyebrow">0.6 · WebRTC</span>
+      <h2>让两台设备直接连接</h2>
+      <p>页面只负责建立连接。文字和文件通过加密的 WebRTC DataChannel 在设备之间传输。</p>
+    </section>
+
+    <section class="card" id="connect-card">
+      <div class="section-title"><span>1</span><div><h3>建立连接</h3><p>在两台设备上打开此页面，通过聊天工具交换一次性连接码。</p></div></div>
+      <div class="choice-row">
+        <button id="create" class="primary">创建连接</button>
+        <button id="join">加入连接</button>
+        <button id="disconnect" class="danger" disabled>断开</button>
+      </div>
+      <div id="creator-flow" class="flow" hidden>
+        <label>把邀请连接码发给另一台设备</label>
+        <textarea id="offer-out" readonly placeholder="正在生成…"></textarea>
+        <button data-copy="offer-out">复制邀请码</button>
+        <label>粘贴另一台设备返回的应答码</label>
+        <textarea id="answer-in" placeholder="粘贴应答码"></textarea>
+        <button id="apply-answer" class="primary">完成连接</button>
+      </div>
+      <div id="joiner-flow" class="flow" hidden>
+        <label>粘贴对方发来的邀请连接码</label>
+        <textarea id="offer-in" placeholder="粘贴邀请码"></textarea>
+        <button id="make-answer" class="primary">生成应答码</button>
+        <label>把应答码发回创建连接的设备</label>
+        <textarea id="answer-out" readonly placeholder="等待生成…"></textarea>
+        <button data-copy="answer-out">复制应答码</button>
+      </div>
+      <p id="connect-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="card disabled" id="transfer-card">
+      <div class="section-title"><span>2</span><div><h3>发送内容</h3><p>连接成功后可以双向发送文字和文件。</p></div></div>
+      <label for="text">文字</label>
+      <textarea id="text" placeholder="输入要发送的文字"></textarea>
+      <button id="send-text" class="primary" disabled>发送文字</button>
+      <div class="divider"></div>
+      <label for="files">文件</label>
+      <input id="files" type="file" multiple disabled>
+      <button id="send-files" disabled>发送所选文件</button>
+      <progress id="progress" max="100" value="0" hidden></progress>
+      <p id="transfer-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="card">
+      <div class="section-title"><span>3</span><div><h3>收到的内容</h3><p>内容只保留在当前页面；刷新页面后清空。</p></div></div>
+      <div id="inbox" class="inbox"><p class="empty">还没有收到内容</p></div>
+    </section>
+    <footer>ClipBridge 不上传传输内容 · <a href="https://github.com/Junfei-Z/clipbridge">源代码</a></footer>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
