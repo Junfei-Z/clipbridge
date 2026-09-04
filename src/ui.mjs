@@ -106,6 +106,15 @@ export function renderDashboard({
     .desktop-note { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 18px; padding: 11px 13px; border: 1px solid #e8e4fb; border-radius: 13px; color: #657086; background: #faf8ff; font-size: 12px; line-height: 1.5; }
     .desktop-note strong { color: #4e2ad5; white-space: nowrap; }
     .agent-grid { display: grid; gap: 12px; }
+    .environment-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .environment-item { min-width: 0; padding: 9px 10px; border: 1px solid #e5e8ef; border-radius: 12px; color: #7b8497; background: #fafbfc; font-size: 11px; }
+    .environment-item strong { display: block; margin-bottom: 2px; color: #59647a; font-size: 12px; }
+    .environment-item[data-ok="true"] { border-color: #bce8d0; background: #f1fbf5; }
+    .environment-item[data-ok="true"] strong { color: #168652; }
+    .environment-item[data-ok="false"] { border-color: #f1d3a7; background: #fff9ef; }
+    .environment-item[data-ok="false"] strong { color: #a66316; }
+    .environment-detail { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .prompt-box { min-height: 190px; color: #39445a; background: #f7f5ff; }
     .compact-area { min-height: 88px; font-family: inherit; font-size: 14px; }
     .handoff-list { display: grid; gap: 9px; margin-top: 16px; }
     .handoff-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid #eceef3; border-radius: 14px; background: #fafbfc; }
@@ -162,6 +171,7 @@ export function renderDashboard({
       .pair-route::before, .pair-route::after { width: 8px; }
       .pair-route span { width: 7px; height: 7px; border-radius: 50%; background: #20b26b; }
       .form-grid { grid-template-columns: 1fr; }
+      .environment-bar { grid-template-columns: 1fr 1fr; }
       .destination { grid-template-columns: 1fr; }
       .form-grid .full { grid-column: auto; }
       .pair-box { grid-template-columns: 1fr; text-align: center; }
@@ -412,13 +422,28 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
       <section class="card" aria-labelledby="agent-title">
         <div class="row-heading"><div><div class="eyebrow">桌面端 Beta · GitHub 项目交接</div><h2 id="agent-title">Agent Handoff</h2></div><span class="role-pill">电脑专用</span></div>
         <div class="desktop-note"><strong>使用限制</strong><span>仅支持安装了 Git、Node.js，并能访问同一 GitHub 仓库的 Mac、Windows 或 Linux 电脑。手机和平板不能创建或应用代码补丁。</span></div>
-        <div class="agent-grid">
-          <label>Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
-          <label>当前目标<textarea class="compact-area" id="handoff-goal" placeholder="接下来要完成什么？"></textarea></label>
-          <label>当前状态<textarea class="compact-area" id="handoff-summary" placeholder="已经完成什么？有哪些关键决定？"></textarea></label>
-          <label>下一步<textarea class="compact-area" id="handoff-next" placeholder="另一台电脑上的 Agent 应先做什么？"></textarea></label>
+        <div class="environment-bar" id="handoff-environment" aria-label="Agent Handoff 环境状态">
+          <div class="environment-item" data-key="git"><strong>○ Git</strong><span class="environment-detail">检测中…</span></div>
+          <div class="environment-item" data-key="node"><strong>○ Node.js</strong><span class="environment-detail">检测中…</span></div>
+          <div class="environment-item" data-key="repository"><strong>○ Git 项目</strong><span class="environment-detail">等待目录</span></div>
+          <div class="environment-item" data-key="github"><strong>○ GitHub</strong><span class="environment-detail">等待远端</span></div>
         </div>
-        <div class="actions"><button class="primary" id="create-handoff">创建并推送交接</button><button class="secondary" id="refresh-handoffs">获取待接手任务</button></div>
+        <div class="agent-grid">
+          <label>1. Git 项目目录<input id="handoff-repository" value="." placeholder="/Users/name/project 或 C:\\Users\\name\\project"></label>
+          <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
+
+CLIPBRIDGE_HANDOFF_V1
+## 当前目标
+（项目现在最终想完成什么）
+## 已完成、关键决定与当前状态
+（已完成内容、重要文件、验证结果、约束、风险和未跟踪文件）
+## 下一步
+（接手 Agent 按顺序应该做什么）
+END_CLIPBRIDGE_HANDOFF</textarea></label>
+          <div class="actions"><button class="secondary" id="copy-handoff-prompt">复制官方 Prompt</button></div>
+          <label>3. 粘贴 Agent 的完整回复<textarea id="handoff-response" placeholder="把 Agent 按照上面格式生成的完整回复粘贴到这里…"></textarea></label>
+        </div>
+        <div class="actions"><button class="primary" id="create-handoff">4. 创建并推送交接</button><button class="secondary" id="refresh-handoffs">获取待接手任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
         <div class="message" id="handoff-message" role="status" aria-live="polite"></div>
         <div class="handoff-list" id="handoff-list"><div class="empty">输入 Git 项目目录，然后获取待接手任务。</div></div>
         <pre class="handoff-preview" id="handoff-preview" hidden></pre>
@@ -570,6 +595,9 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     const localFileWorkspace = document.querySelector('#local-file-workspace');
     const localAgentWorkspace = document.querySelector('#local-agent-workspace');
     const handoffRepository = document.querySelector('#handoff-repository');
+    const handoffEnvironmentBar = document.querySelector('#handoff-environment');
+    const handoffPrompt = document.querySelector('#handoff-prompt');
+    const handoffResponse = document.querySelector('#handoff-response');
     const handoffList = document.querySelector('#handoff-list');
     const handoffPreview = document.querySelector('#handoff-preview');
     const handoffMessage = document.querySelector('#handoff-message');
@@ -580,9 +608,24 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     let currentPairUrl = '';
     let pairingPoll = null;
     let localUpload = null;
+    let environmentTimer = null;
 
     const handoffShow = (text, error = false) => { handoffMessage.textContent = text; handoffMessage.style.color = error ? '#d14343' : ''; };
     const repositoryQuery = () => '?repository=' + encodeURIComponent(handoffRepository.value.trim() || '.');
+
+    async function checkHandoffEnvironment() {
+      try {
+        const data = await apiJson('/api/v1/handoff-environment' + repositoryQuery());
+        for (const [key, status] of Object.entries(data)) {
+          const item = handoffEnvironmentBar.querySelector('[data-key="' + key + '"]');
+          if (!item) continue;
+          item.dataset.ok = String(status.ok);
+          item.querySelector('strong').textContent = (status.ok ? '● ' : '● ') + ({ git: 'Git', node: 'Node.js', repository: 'Git 项目', github: 'GitHub' })[key];
+          item.querySelector('.environment-detail').textContent = status.detail;
+          item.title = status.detail;
+        }
+      } catch (error) { handoffShow(error.message, true); }
+    }
 
     function activateLocalMode(name) {
       const workspaces = { text: localTextWorkspace, file: localFileWorkspace, agent: localAgentWorkspace };
@@ -591,6 +634,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         document.querySelector('#local-' + mode + '-mode').setAttribute('aria-selected', String(active));
       }
       if (name === 'file') refreshLocalFiles();
+      if (name === 'agent') checkHandoffEnvironment();
     }
 
     async function inspectHandoffFromUi(id) {
@@ -632,11 +676,17 @@ function localModeScript({ fileLimitLabel, relayNode }) {
     }
 
     for (const mode of localModes) mode.addEventListener('click', () => activateLocalMode(mode.id.replace('local-', '').replace('-mode', '')));
+    document.querySelector('#copy-handoff-prompt').addEventListener('click', async () => {
+      const copied = await copyText(handoffPrompt.value, handoffPrompt);
+      handoffShow(copied ? '官方 Prompt 已复制，请发给当前 Agent。' : '已选中 Prompt，请手动复制。');
+    });
+    document.querySelector('#check-handoff-environment').addEventListener('click', checkHandoffEnvironment);
+    handoffRepository.addEventListener('input', () => { clearTimeout(environmentTimer); environmentTimer = setTimeout(checkHandoffEnvironment, 450); });
     refreshHandoffsButton.addEventListener('click', () => refreshHandoffs(true));
     createHandoffButton.addEventListener('click', async () => {
       createHandoffButton.disabled = true; handoffShow('正在创建并推送安全交接包…');
       try {
-        const data = await apiJson('/api/v1/handoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.', goal: document.querySelector('#handoff-goal').value, summary: document.querySelector('#handoff-summary').value, next: document.querySelector('#handoff-next').value, push: true }) });
+        const data = await apiJson('/api/v1/handoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repository: handoffRepository.value.trim() || '.', agentResponse: handoffResponse.value, push: true }) });
         handoffShow('已推送交接：' + data.id); await refreshHandoffs(false);
       } catch (error) { handoffShow(error.message, true); }
       finally { createHandoffButton.disabled = false; }

@@ -1,6 +1,6 @@
 {
   "name": "clipbridge",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "A local-first device relay with portable Git-based Agent Handoff packages.",
   "type": "module",

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
-import { applyHandoff, createHandoff, findSensitivePatch, inspectHandoff, listHandoffs } from "../src/handoff.mjs";
+import { applyHandoff, createHandoff, findSensitivePatch, handoffEnvironment, inspectHandoff, listHandoffs, parseAgentHandoffResponse } from "../src/handoff.mjs";
 
 const exec = promisify(execFile);
 const git = (cwd, args) => exec("git", args, { cwd, encoding: "utf8" });
@@ -52,4 +52,28 @@ test("verifies and applies a handoff patch to a clean clone", async () => {
 test("detects common credentials in a patch", () => {
   assert.ok(findSensitivePatch("+API_KEY=definitely-secret-value"));
   assert.equal(findSensitivePatch("+const label = 'safe';"), null);
+});
+
+test("parses one pasted Agent response into the portable handoff fields", () => {
+  const parsed = parseAgentHandoffResponse(`CLIPBRIDGE_HANDOFF_V1
+## 当前目标
+完成桌面交接 UI
+## 已完成、关键决定与当前状态
+已经加入环境检测。\n验证中文内容。
+## 下一步
+运行测试并发布
+END_CLIPBRIDGE_HANDOFF`);
+  assert.equal(parsed.goal, "完成桌面交接 UI");
+  assert.match(parsed.summary, /环境检测/);
+  assert.equal(parsed.next, "运行测试并发布");
+});
+
+test("reports Node, Git, repository, and GitHub remote readiness", async () => {
+  const root = await repository();
+  await git(root, ["remote", "add", "origin", "git@github.com:example/project.git"]);
+  const status = await handoffEnvironment(root);
+  assert.equal(status.node.ok, true);
+  assert.equal(status.git.ok, true);
+  assert.equal(status.repository.ok, true);
+  assert.equal(status.github.ok, true);
 });

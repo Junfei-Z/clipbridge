@@ -59,6 +59,51 @@ export function findSensitivePatch(patch) {
   return SECRET_PATTERNS.find((pattern) => pattern.test(patch))?.source || null;
 }
 
+export function parseAgentHandoffResponse(value) {
+  const text = markdown(value);
+  if (!text) throw new Error("请先粘贴 Agent 生成的交接说明。");
+  const sections = new Map();
+  let current = "summary";
+  sections.set(current, []);
+  for (const line of text.split("\n")) {
+    const heading = line.match(/^#{1,3}\s*(.+?)\s*$/)?.[1]?.toLowerCase();
+    if (heading) {
+      if (/goal|目标/.test(heading)) current = "goal";
+      else if (/next|下一步|后续/.test(heading)) current = "next";
+      else current = "summary";
+      if (!sections.has(current)) sections.set(current, []);
+      continue;
+    }
+    if (!/^\s*(?:clipbridge_handoff_v1|end_clipbridge_handoff)\s*$/i.test(line)) sections.get(current).push(line);
+  }
+  return {
+    goal: cleanText(sections.get("goal")?.join("\n"), "Continue the current repository task"),
+    summary: cleanText(sections.get("summary")?.join("\n"), text),
+    next: cleanText(sections.get("next")?.join("\n"), "Inspect the package, apply the patch, verify, and continue."),
+  };
+}
+
+export async function handoffEnvironment(cwd = process.cwd()) {
+  const result = {
+    node: { ok: true, detail: process.version },
+    git: { ok: false, detail: "未找到 Git" },
+    repository: { ok: false, detail: "请选择 Git 项目目录" },
+    github: { ok: false, detail: "未配置 GitHub origin" },
+  };
+  try { result.git = { ok: true, detail: (await execFileAsync("git", ["--version"], { encoding: "utf8" })).stdout.trim() }; }
+  catch { return result; }
+  try {
+    const repo = await repositoryInfo(cwd);
+    result.repository = { ok: true, detail: repo.root };
+    result.github = repo.remote && /(?:github\.com[:/]|github\.com$)/i.test(repo.remote)
+      ? { ok: true, detail: repo.remote }
+      : { ok: false, detail: repo.remote ? "origin 不是 GitHub 仓库" : "未配置 origin" };
+  } catch (error) {
+    result.repository.detail = error.message;
+  }
+  return result;
+}
+
 export async function repositoryInfo(cwd) {
   const root = (await git(cwd, ["rev-parse", "--show-toplevel"])).trim();
   const baseCommit = (await git(root, ["rev-parse", "HEAD"])).trim();

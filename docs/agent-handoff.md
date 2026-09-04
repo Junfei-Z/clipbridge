@@ -2,6 +2,15 @@
 
 > **Computer-only:** Agent Handoff requires Git and Node.js on macOS, Windows, or Linux. Phones and tablets can still use ClipBridge text and file transfer, but cannot create or apply repository handoffs.
 
+## Desktop UI workflow
+
+1. Select the local Git project directory. ClipBridge checks Node.js, Git, repository validity, and the GitHub origin automatically.
+2. Copy the official prompt shown in the Agent tab and send it to the Agent currently working on the project.
+3. Paste the Agent's complete structured response into the single response field.
+4. Choose **Create and push handoff**. ClipBridge extracts the goal, current state, and next actions and packages them with the tracked Git patch.
+
+Free-form replies are accepted as a fallback, but the official prompt produces a more reliable cross-device handoff.
+
 Agent Handoff moves a repository task between computers without copying a vendor-specific chat session. Git carries committed project history; ClipBridge adds a small, reviewable package for the unfinished work and the context the next agent needs.
 
 ## What is transferred

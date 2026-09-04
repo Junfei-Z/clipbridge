@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.3 - 2026-09-04
+
+### Added
+
+- A copyable official prompt that asks the current Agent for a structured, portable handoff response.
+- One paste box that automatically maps the Agent's complete response into the handoff package, replacing three manual context fields.
+- Automatic readiness indicators for Node.js, Git, the selected Git repository, and its GitHub origin.
+
+### Verified
+
+- The structured response parser preserves Chinese handoff content and falls back safely for free-form Agent replies.
+- All 58 automated tests pass, and the revised desktop workflow was exercised in the browser.
+
 ## 0.7.2 - 2026-09-04
 
 ### Added

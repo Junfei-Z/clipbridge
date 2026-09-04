@@ -5,7 +5,7 @@ import path from "node:path";
 import { DeviceRegistry, normalizeDeviceName, normalizeDeviceType } from "./devices.mjs";
 import { FileTransferStore, MAX_FILE_TARGETS, filePresentation } from "./files.mjs";
 import { HistoryStore } from "./history.mjs";
-import { applyHandoff, createHandoff, inspectHandoff, listHandoffs } from "./handoff.mjs";
+import { applyHandoff, createHandoff, handoffEnvironment, inspectHandoff, listHandoffs, parseAgentHandoffResponse } from "./handoff.mjs";
 import { isRelayTargetId, managementSession, relayNodeIdentity } from "./identity.mjs";
 import { InboxStore } from "./inbox.mjs";
 import { isLoopbackAddress, isPrivateAddress } from "./network.mjs";
@@ -13,7 +13,7 @@ import { PairingManager } from "./pairing.mjs";
 import { createQrSvg } from "./qr.mjs";
 import { clientDeviceFromUserAgent, renderDashboard } from "./ui.mjs";
 
-const APP_VERSION = "0.7.2";
+const APP_VERSION = "0.7.3";
 const JSON_TYPE = "application/json; charset=utf-8";
 const STATIC_ASSETS = new Map([
   ["/favicon.ico", { source: new URL("../assets/favicon.ico", import.meta.url), type: "image/x-icon" }],
@@ -334,17 +334,28 @@ export function createClipBridgeServer({
         return;
       }
 
+      if (requestUrl.pathname === "/api/v1/handoff-environment" && request.method === "GET") {
+        if (!isLocal) {
+          json(response, 403, { error: "Agent Handoff 环境检测只能在中转电脑上运行。" });
+          return;
+        }
+        const repository = requestUrl.searchParams.get("repository") || process.cwd();
+        json(response, 200, await handoffEnvironment(repository));
+        return;
+      }
+
       if (requestUrl.pathname === "/api/v1/handoffs" && request.method === "POST") {
         if (!isLocal) {
           json(response, 403, { error: "Agent Handoff 只能在安装了 Git 和 Node.js 的中转电脑上使用。" });
           return;
         }
         const body = await readJson(request, 256 * 1024);
+        const context = body.agentResponse ? parseAgentHandoffResponse(body.agentResponse) : body;
         const result = await createHandoff({
           cwd: body.repository || process.cwd(),
-          goal: body.goal,
-          summary: body.summary,
-          next: body.next,
+          goal: context.goal,
+          summary: context.summary,
+          next: context.next,
           push: body.push !== false
         });
         json(response, 201, result);

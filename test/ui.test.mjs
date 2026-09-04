@@ -45,9 +45,11 @@ test("renders clipboard and device pairing management for Windows localhost", ()
   assert.match(html, /电脑专用/);
   assert.match(html, /手机和平板不能创建或应用代码补丁/);
   assert.match(html, /id="handoff-repository"/);
-  assert.match(html, /id="handoff-goal"/);
-  assert.match(html, /id="handoff-summary"/);
-  assert.match(html, /id="handoff-next"/);
+  assert.match(html, /id="handoff-environment"/);
+  assert.match(html, /id="handoff-prompt"/);
+  assert.match(html, /id="copy-handoff-prompt"/);
+  assert.match(html, /id="handoff-response"/);
+  assert.match(html, /CLIPBRIDGE_HANDOFF_V1/);
   assert.match(html, /文件收件箱/);
   assert.match(html, /id="local-file-outbox"/);
   assert.match(html, /共享 Blob · 独立投递/);
