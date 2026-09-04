@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.12 - 2026-09-04
+
+### Added
+
+- Added a top-right Chinese/English language control to the local relay, paired-device, Agent Handoff, and public WebRTC interfaces.
+- The first visit follows the browser language and subsequent visits remember the choice locally on each device.
+- Added a fully English Agent Handoff prompt plus localized dynamic statuses, confirmation dialogs, dates, accessibility labels, and error messages.
+
+### Safety
+
+- User clipboard text, file names, device names, repository paths, and handoff contents are excluded from interface translation.
+
+### Verified
+
+- Browser interaction verified English and Chinese rendering and persisted switching in both the local relay and public PWA.
+- All automated checks pass locally; the release commit intentionally skips hosted CI to preserve the repository's Actions allowance.
+
 ## 0.7.11 - 2026-09-04
 
 ### Fixed

@@ -1,3 +1,5 @@
+import { ENGLISH_HANDOFF_PROMPT, ENGLISH_UI_TEXT } from "./ui-i18n.mjs";
+
 export function renderDashboard({
   deviceName,
   relayNode,
@@ -19,6 +21,8 @@ export function renderDashboard({
   };
   const safeDeviceName = escapeHtml(deviceName);
   const fileLimitLabel = formatFileLimit(maxFileBytes);
+  const englishUiText = safeScriptJson(ENGLISH_UI_TEXT);
+  const englishHandoffPrompt = safeScriptJson(ENGLISH_HANDOFF_PROMPT);
   const panel = isLocal
     ? renderLocalPanel(fileLimitLabel, normalizedRelay)
     : renderRemotePanel(safeDeviceName, normalizedClient, fileLimitLabel, normalizedRelay);
@@ -49,6 +53,8 @@ export function renderDashboard({
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
     main { width: min(720px, 100%); }
     header { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 18px; }
+    .header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+    .language-toggle { min-width: 48px; padding: 7px 10px; border: 1px solid #dfe3ec; border-radius: 999px; color: #4e2ad5; background: #fff; box-shadow: 0 3px 10px #26334d0d; font-size: 12px; letter-spacing: .02em; }
     .brand { display: inline-flex; align-items: center; gap: 9px; }
     .brand-icon { width: 40px; height: 40px; object-fit: contain; image-rendering: auto; filter: drop-shadow(0 4px 8px #5f35f233); }
     h1 { font-size: 20px; margin: 0; }
@@ -183,6 +189,7 @@ export function renderDashboard({
     @media (max-width: 560px) {
       body { align-items: start; padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom)); }
       header { align-items: flex-start; }
+      .header-actions { align-items: flex-end; flex-direction: column-reverse; gap: 7px; }
       .status { max-width: 52%; font-size: 12px; }
       .card { padding: 17px; border-radius: 20px; }
       .actions button { flex: 1 1 auto; }
@@ -221,6 +228,7 @@ export function renderDashboard({
       .notice, .warning { color: #e7d99f; background: #302a18; border-color: #554a27; }
       .role-strip { color: #c7cfdd; background: #23202f; border-color: #3b4050; }
       .role-pill { color: #e1d8ff; background: #3b2d67; }
+      .language-toggle { color: #e1d8ff; background: #222631; border-color: #3b4050; }
       .desktop-note, .handoff-item, .handoff-preview { color: #c7cfdd; background: #222631; border-color: #3b4050; }
     }
   </style>
@@ -229,12 +237,125 @@ export function renderDashboard({
   <main>
     <header>
       <div class="brand"><img class="brand-icon" src="/brand-icon-96.png" srcset="/brand-icon-96.png 96w, /brand-icon-192.png 192w" sizes="40px" width="40" height="40" alt=""><h1>ClipBridge</h1></div>
-      <span class="status"><i class="dot"></i><span id="connection-status">${isLocal ? `管理端 · ${normalizedRelay.type === "mac" ? "Mac" : "Windows"} 中转` : "等待配对"}</span></span>
+      <div class="header-actions"><span class="status"><i class="dot"></i><span id="connection-status">${isLocal ? `管理端 · ${normalizedRelay.type === "mac" ? "Mac" : "Windows"} 中转` : "等待配对"}</span></span><button class="language-toggle" id="language-toggle" type="button" aria-label="Switch to English">EN</button></div>
     </header>
     ${panel}
     <div class="warning">仅在可信私人网络中使用。当前局域网传输尚未加密，请勿传输密码、验证码或私钥。</div>
   </main>
   <script>
+    const LANGUAGE_KEY = 'clipbridge.language.v1';
+    const englishUiText = ${englishUiText};
+    const englishHandoffPrompt = ${englishHandoffPrompt};
+    const storedLanguage = localStorage.getItem(LANGUAGE_KEY);
+    const currentLanguage = storedLanguage === 'en' || storedLanguage === 'zh' ? storedLanguage : (/^zh\\b/i.test(navigator.language) ? 'zh' : 'en');
+    const uiLocale = currentLanguage === 'en' ? 'en-US' : 'zh-CN';
+    function translatedUiText(value) {
+      if (currentLanguage !== 'en') return value;
+      const match = String(value).match(/^(\\s*)([\\s\\S]*?)(\\s*)$/);
+      const leading = match[1], text = match[2], trailing = match[3];
+      let translated = englishUiText[text];
+      if (!translated) {
+        const patterns = [
+          [/^(Mac|Windows|设备) 中转节点 · (.+)$/, (_, kind, name) => (kind === '设备' ? 'Device' : kind) + ' relay · ' + name],
+          [/^(Mac|Windows|设备) 中转节点剪贴板$/, (_, kind) => (kind === '设备' ? 'Device' : kind) + ' relay clipboard'],
+          [/^查看当前内容，修改后可以重新保存到 (Mac|Windows|设备) 剪贴板。$/, (_, kind) => 'View the current content, edit it, and save it back to the ' + (kind === '设备' ? 'device' : kind) + ' clipboard.'],
+          [/^(Mac|Windows|设备) 中转节点$/, (_, kind) => (kind === '设备' ? 'Device' : kind) + ' relay'],
+          [/^与 (.+) 配对$/, (_, name) => 'Pair with ' + name],
+          [/^在 (Mac|Windows|设备) 中转节点的 ClipBridge 中点击“配对新设备”，然后扫描二维码或输入 6 位配对码。$/, (_, kind) => 'On the ' + (kind === '设备' ? 'device' : kind) + ' relay, choose “Pair new device”, then scan the QR code or enter the 6-digit code.'],
+          [/^单文件上限 (.+)$/, (_, size) => 'Per-file limit ' + size],
+          [/^(\\d+) 个文件 · (.+)$/, (_, count, size) => count + ' files · ' + size],
+          [/^(.+) · 上传一次，共享给 (\\d+) 台设备$/, (_, size, count) => size + ' · Uploaded once, shared with ' + count + ' devices'],
+          [/^(.+) · (已下载|待接收)$/, (_, name, state) => name + ' · ' + englishUiText[state]],
+          [/^(.+) · 已定向选择 (\\d+) 台 Agent 电脑。$/, (_, remote, count) => remote + ' · ' + count + ' Agent computers selected.'],
+          [/^(.+) · 未选择设备，将发布给此仓库内全部 Agent 电脑。$/, (_, remote) => remote + ' · No recipient selected; publishing to all Agent computers in this repository.'],
+          [/^已登录 (.+)$/, (_, account) => 'Signed in as ' + account],
+          [/^GitHub · (.+)$/, (_, account) => 'GitHub · ' + account],
+          [/^(.+) · 私有$/, (_, repository) => repository + ' · Private'],
+          [/^([●○]) Git 项目$/, (_, marker) => marker + ' Git project'],
+          [/^(.+) 或 (.+)$/, (_, first, second) => first + ' or ' + second],
+          [/^项目已拉取到 (.+)，正在登记当前电脑…$/, (_, path) => 'Project cloned to ' + path + '. Registering this computer…'],
+          [/^本地比 GitHub 多 (\\d+) 个提交，请先 push 后再交接。$/, (_, count) => 'Local is ' + count + ' commits ahead of GitHub. Push before creating a handoff.'],
+          [/^已安全快进更新 (\\d+) 个提交，正在登记当前电脑…$/, (_, count) => 'Safely fast-forwarded ' + count + ' commits. Registering this computer…'],
+          [/^目标目录已经存在：(.+)$/, (_, path) => 'The destination folder already exists: ' + path],
+          [/^GitHub 上没有 (.+) 分支，无法自动更新。$/, (_, branch) => 'GitHub does not have branch ' + branch + ', so it cannot be updated automatically.'],
+          [/^本地与 GitHub 已分叉（本地多 (\\d+) 个提交，远端多 (\\d+) 个提交），请人工合并。$/, (_, ahead, behind) => 'Local and GitHub histories diverged (local ahead by ' + ahead + ', remote ahead by ' + behind + '). Merge them manually.'],
+          [/^文件超过 (\\d+) 字节的上限。$/, (_, bytes) => 'The file exceeds the ' + bytes + '-byte limit.'],
+          [/^已登记 Agent 电脑：(.+)$/, (_, name) => 'Agent computer registered: ' + name],
+          [/^来自 (.+) · (.+)$/, (_, name, date) => 'From ' + name + ' · ' + date],
+          [/^交接已发布。接收电脑现在可以获取任务：(.+)$/, (_, id) => 'Handoff published. The receiving computer can now fetch task: ' + id],
+          [/^正在读取(Mac|Windows|中转节点)剪贴板…$/, (_, kind) => 'Reading ' + kind + ' clipboard…'],
+          [/^已保存到(Mac|Windows|中转节点)剪贴板$/, (_, kind) => 'Saved to ' + kind + ' clipboard'],
+          [/^最近连接：(.+)$/, (_, date) => 'Last connected: ' + date],
+          [/^有效至 (.+)，使用一次后立即作废。$/, (_, time) => 'Valid until ' + time + ' and invalid after one use.'],
+          [/^(.+) 前有效$/, (_, date) => 'Valid until ' + date],
+          [/^正在发送 (.+)…$/, (_, name) => 'Sending ' + name + '…'],
+          [/^已发送 (\\d+) 个文件 · (.+)$/, (_, count, detail) => 'Sent ' + count + ' files · ' + detail.replaceAll('：', ': ').replaceAll('；', '; ').replaceAll('已送达', 'Delivered').replaceAll('已下载', 'Downloaded').replaceAll('待接收', 'Pending')],
+          [/^已清理 (\\d+) 个文件$/, (_, count) => 'Removed ' + count + ' files'],
+          [/^已清空 (\\d+) 条记录$/, (_, count) => 'Cleared ' + count + ' entries'],
+          [/^已清空 (\\d+) 条待接收内容$/, (_, count) => 'Cleared ' + count + ' pending items'],
+          [/^文件 · (\\d+)$/, (_, count) => 'Files · ' + count],
+          [/^接收 · (\\d+)$/, (_, count) => 'Receive · ' + count],
+          [/^(.+) → 此设备$/, (_, name) => name + ' → This device'],
+          [/^已收到 (.+)$/, (_, name) => 'Received ' + name],
+          [/^正在接收 (.+) · (\\d+)%$/, (_, name, percent) => 'Receiving ' + name + ' · ' + percent + '%'],
+          [/^(.+) 已发送$/, (_, name) => name + ' sent'],
+          [/^文件 (.+) 校验失败$/, (_, name) => 'File verification failed: ' + name],
+          [/^取消这台设备与 (.+) 的配对？$/, (_, name) => 'Unpair this device from ' + name + '?'],
+          [/^撤销“(.+)”的访问权限？$/, (_, name) => 'Revoke access for “' + name + '”?'],
+          [/^把交接包“(.+)”的修改应用到这个 Git 项目？接收项目必须是干净工作区。$/, (_, id) => 'Apply handoff “' + id + '” to this Git project? The receiving working tree must be clean.']
+        ];
+        for (const [pattern, replacement] of patterns) {
+          if (pattern.test(text)) { translated = text.replace(pattern, replacement); break; }
+        }
+      }
+      return leading + (translated || text) + trailing;
+    }
+
+    function translateUiNode(root) {
+      if (!root || root.nodeType === Node.ELEMENT_NODE && root.closest('[data-no-translate]')) return;
+      if (root.nodeType === Node.TEXT_NODE) {
+        const parent = root.parentElement;
+        if (!parent || ['SCRIPT', 'STYLE'].includes(parent.tagName)) return;
+        const translated = translatedUiText(root.nodeValue);
+        if (root.nodeValue !== translated) root.nodeValue = translated;
+        return;
+      }
+      if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE) return;
+      const elements = root.nodeType === Node.ELEMENT_NODE ? [root, ...root.querySelectorAll('*')] : [...document.querySelectorAll('*')];
+      for (const element of elements) {
+        if (element.closest('[data-no-translate]')) continue;
+        for (const attribute of ['aria-label', 'placeholder', 'title']) {
+          if (!element.hasAttribute(attribute)) continue;
+          const translated = translatedUiText(element.getAttribute(attribute));
+          if (element.getAttribute(attribute) !== translated) element.setAttribute(attribute, translated);
+        }
+      }
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let textNode; while ((textNode = walker.nextNode())) translateUiNode(textNode);
+    }
+
+    function initializeLanguage() {
+      document.documentElement.lang = currentLanguage === 'en' ? 'en' : 'zh-CN';
+      translateUiNode(document);
+      const prompt = document.querySelector('#handoff-prompt[data-i18n-value]');
+      if (prompt && currentLanguage === 'en') prompt.value = englishHandoffPrompt;
+      const toggle = document.querySelector('#language-toggle');
+      toggle.textContent = currentLanguage === 'en' ? '中文' : 'EN';
+      toggle.setAttribute('aria-label', currentLanguage === 'en' ? '切换到中文' : 'Switch to English');
+      toggle.addEventListener('click', () => {
+        localStorage.setItem(LANGUAGE_KEY, currentLanguage === 'en' ? 'zh' : 'en');
+        location.reload();
+      });
+      new MutationObserver((changes) => {
+        if (currentLanguage !== 'en') return;
+        for (const change of changes) {
+          if (change.type === 'characterData' || change.type === 'attributes') translateUiNode(change.target);
+          for (const node of change.addedNodes) translateUiNode(node);
+        }
+      }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'placeholder', 'title'] });
+    }
+
+    initializeLanguage();
     const message = document.querySelector('#message');
     const show = (text, error = false) => {
       if (!message) return;
@@ -274,8 +395,8 @@ export function renderDashboard({
         const item = document.createElement('article'); item.className = 'history-item';
         const top = document.createElement('div'); top.className = 'history-top';
         const route = document.createElement('div'); route.className = 'history-route'; route.textContent = entry.source.name + ' → ' + entry.target.name;
-        const meta = document.createElement('time'); meta.className = 'history-meta'; meta.dateTime = entry.createdAt; meta.textContent = new Date(entry.createdAt).toLocaleString();
-        const content = document.createElement('p'); content.className = 'history-text'; content.textContent = entry.text || '（空文本）';
+        const meta = document.createElement('time'); meta.className = 'history-meta'; meta.dateTime = entry.createdAt; meta.textContent = new Date(entry.createdAt).toLocaleString(uiLocale);
+        const content = document.createElement('p'); content.className = 'history-text'; if (entry.text) content.dataset.noTranslate = ''; content.textContent = entry.text || '（空文本）';
         const actions = document.createElement('div'); actions.className = 'history-actions';
         const use = document.createElement('button'); use.className = 'quiet'; use.textContent = actionLabel;
         const remove = document.createElement('button'); remove.className = 'quiet danger'; remove.textContent = '删除';
@@ -322,7 +443,7 @@ export function renderDashboard({
       }
       for (const batch of batches) {
         const item = document.createElement('article'); item.className = 'history-item';
-        const name = document.createElement('p'); name.className = 'file-name'; name.textContent = batch.name;
+        const name = document.createElement('p'); name.className = 'file-name'; name.dataset.noTranslate = ''; name.textContent = batch.name;
         const detail = document.createElement('div'); detail.className = 'file-detail'; detail.textContent = formatBytes(batch.bytes) + ' · 上传一次，共享给 ' + batch.deliveries.length + ' 台设备';
         const chips = document.createElement('div'); chips.className = 'delivery-chips';
         for (const delivery of batch.deliveries) {
@@ -342,9 +463,9 @@ export function renderDashboard({
         const item = document.createElement('article'); item.className = 'history-item';
         const top = document.createElement('div'); top.className = 'history-top';
         const route = document.createElement('div'); route.className = 'history-route'; route.textContent = entry.source.name + ' → ' + entry.target.name;
-        const time = document.createElement('time'); time.className = 'history-meta'; time.textContent = new Date(entry.createdAt).toLocaleString();
-        const name = document.createElement('p'); name.className = 'file-name'; name.textContent = entry.name;
-        const detail = document.createElement('div'); detail.className = 'file-detail'; detail.textContent = formatBytes(entry.bytes) + ' · ' + new Date(entry.expiresAt).toLocaleString() + ' 前有效';
+        const time = document.createElement('time'); time.className = 'history-meta'; time.textContent = new Date(entry.createdAt).toLocaleString(uiLocale);
+        const name = document.createElement('p'); name.className = 'file-name'; name.dataset.noTranslate = ''; name.textContent = entry.name;
+        const detail = document.createElement('div'); detail.className = 'file-detail'; detail.textContent = formatBytes(entry.bytes) + ' · ' + new Date(entry.expiresAt).toLocaleString(uiLocale) + ' 前有效';
         const actions = document.createElement('div'); actions.className = 'history-actions';
         if (entry.previewKind) {
           const open = document.createElement('button'); open.className = 'quiet'; open.textContent = entry.previewKind === 'text' ? '安全预览' : '打开'; open.addEventListener('click', () => onOpen(entry)); actions.append(open);
@@ -469,7 +590,7 @@ function renderLocalPanel(fileLimitLabel, relayNode) {
           <section id="agent-send-panel" role="tabpanel" aria-labelledby="agent-send-role">
           <div class="agent-role-intro"><span class="role-pill">发送端</span><span>选择接手电脑，整理当前 Agent 的上下文，然后发布。</span></div>
           <div class="target-block"><div class="target-label">1. 选择接收电脑（可多选；不选择则发布给全部 Agent 电脑）</div><div class="target-picker" id="handoff-targets" role="group" aria-label="Agent 交接对象"><div class="empty">登记当前电脑并刷新列表后，可以选择接手设备。</div></div></div>
-          <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
+          <label>2. 复制这段官方 Prompt<textarea class="prompt-box" id="handoff-prompt" data-i18n-value readonly>请为当前项目生成一份 ClipBridge Agent Handoff 交接说明。请检查当前对话、已经完成的工作、关键决定、尚未解决的问题，以及下一台电脑上的 Agent 应该采取的动作。不要包含密码、令牌、私钥或其他敏感信息。请只返回以下格式，内容要具体、可执行：
 
 CLIPBRIDGE_HANDOFF_V1
 ## 当前目标
@@ -487,7 +608,7 @@ END_CLIPBRIDGE_HANDOFF</textarea></label>
             <div class="agent-role-intro"><span class="role-pill">接收端</span><span>获取发给这台电脑的任务，确认内容后再应用到本地项目。</span></div>
             <div class="actions"><button class="primary" id="refresh-handoffs">1. 获取发给我的任务</button><button class="quiet" id="check-handoff-environment">重新检测环境</button></div>
             <div class="handoff-list" id="handoff-list"><div class="empty">点击“获取发给我的任务”开始接收。</div></div>
-            <pre class="handoff-preview" id="handoff-preview" hidden></pre>
+            <pre class="handoff-preview" id="handoff-preview" data-no-translate hidden></pre>
           </section>
         </div>
         <div class="message" id="handoff-message" role="status" aria-live="polite"></div>
@@ -537,11 +658,11 @@ function renderRemotePanel(deviceName, clientDevice, fileLimitLabel, relayNode) 
       <div class="pairing" aria-label="当前已配对连接">
         <div class="pair-device">
           <span class="device-badge" id="client-device-icon" aria-hidden="true">📱</span>
-          <span class="device-copy"><small>管理设备</small><strong id="client-device-name">${safeClientName}</strong></span>
+          <span class="device-copy"><small>管理设备</small><strong id="client-device-name" data-no-translate>${safeClientName}</strong></span>
         </div>
         <div class="pair-route" aria-hidden="true"><span>已配对</span></div>
         <div class="pair-device">
-          <span class="device-copy"><small>${relayLabel} 中转节点</small><strong id="computer-name">${deviceName}</strong></span>
+          <span class="device-copy"><small>${relayLabel} 中转节点</small><strong id="computer-name" data-no-translate>${deviceName}</strong></span>
           <span class="device-badge" id="relay-device-icon" aria-hidden="true">${relayNode.type === "mac" ? "⌘" : "💻"}</span>
         </div>
       </div>
@@ -829,7 +950,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         for (const handoff of data.handoffs) {
           const item = document.createElement('article'); item.className = 'handoff-item';
           const copy = document.createElement('div'), title = document.createElement('strong'), meta = document.createElement('small');
-          title.textContent = handoff.goal || handoff.id; meta.textContent = (handoff.sender?.name ? '来自 ' + handoff.sender.name + ' · ' : '') + (handoff.date ? new Date(handoff.date).toLocaleString() : handoff.ref); copy.append(title, meta);
+          title.dataset.noTranslate = ''; title.textContent = handoff.goal || handoff.id; meta.textContent = (handoff.sender?.name ? '来自 ' + handoff.sender.name + ' · ' : '') + (handoff.date ? new Date(handoff.date).toLocaleString(uiLocale) : handoff.ref); copy.append(title, meta);
           const actions = document.createElement('div'); actions.className = 'actions'; actions.style.marginTop = '0';
           const inspect = document.createElement('button'); inspect.className = 'quiet'; inspect.textContent = '预览'; inspect.onclick = () => inspectHandoffFromUi(handoff.id);
           const apply = document.createElement('button'); apply.className = 'secondary'; apply.textContent = '接手'; apply.onclick = () => applyHandoffFromUi(handoff.id);
@@ -889,7 +1010,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
           const badge = document.createElement('span'); badge.className = 'device-badge'; badge.textContent = deviceIcon(device.type);
           const copy = document.createElement('span'); copy.className = 'copy';
           const name = document.createElement('strong'); name.textContent = device.name;
-          const meta = document.createElement('small'); meta.textContent = '最近连接：' + new Date(device.lastSeenAt).toLocaleString();
+          const meta = document.createElement('small'); meta.textContent = '最近连接：' + new Date(device.lastSeenAt).toLocaleString(uiLocale);
           const revoke = document.createElement('button'); revoke.className = 'quiet danger'; revoke.textContent = '撤销';
           revoke.addEventListener('click', async () => {
             if (!confirm('撤销“' + device.name + '”的访问权限？')) return;
@@ -1029,7 +1150,7 @@ function localModeScript({ fileLimitLabel, relayNode }) {
         };
         pairUrlSelect.onchange = () => selectPairUrl(Number(pairUrlSelect.value));
         selectPairUrl(0);
-        const expires = new Date(data.expiresAt); pairExpiry.textContent = '有效至 ' + expires.toLocaleTimeString() + '，使用一次后立即作废。';
+        const expires = new Date(data.expiresAt); pairExpiry.textContent = '有效至 ' + expires.toLocaleTimeString(uiLocale) + '，使用一次后立即作废。';
         clearInterval(pairingPoll); pairingPoll = setInterval(() => { refreshDevices(); refreshPeers(); }, 3000);
       } catch (error) { show(error.message, true); }
       finally { pairButton.disabled = false; }
@@ -1176,8 +1297,8 @@ function remoteModeScript({ deviceName, relayNode, clientDevice, legacyToken, pa
           const item = document.createElement('article'); item.className = 'history-item';
           const top = document.createElement('div'); top.className = 'history-top';
           const route = document.createElement('div'); route.className = 'history-route'; route.textContent = transfer.source.name + ' → 此设备';
-          const meta = document.createElement('time'); meta.className = 'history-meta'; meta.textContent = new Date(transfer.createdAt).toLocaleString();
-          const content = document.createElement('p'); content.className = 'history-text'; content.textContent = transfer.text || '（空文本）';
+          const meta = document.createElement('time'); meta.className = 'history-meta'; meta.textContent = new Date(transfer.createdAt).toLocaleString(uiLocale);
+          const content = document.createElement('p'); content.className = 'history-text'; if (transfer.text) content.dataset.noTranslate = ''; content.textContent = transfer.text || '（空文本）';
           const actions = document.createElement('div'); actions.className = 'history-actions';
           const accept = document.createElement('button'); accept.className = 'quiet'; accept.textContent = '复制并收下';
           const dismiss = document.createElement('button'); dismiss.className = 'quiet danger'; dismiss.textContent = '忽略';

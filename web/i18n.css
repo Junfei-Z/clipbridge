@@ -1,0 +1,13 @@
+.language-toggle {
+  padding: 8px 12px;
+  border: 1px solid #ddd7f7;
+  border-radius: 999px;
+  background: #fff;
+  color: #4f24d8;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .language-toggle { padding-inline: 10px; }
+}

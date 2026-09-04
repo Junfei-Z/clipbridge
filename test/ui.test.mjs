@@ -23,6 +23,15 @@ test("links high-resolution shared icons and a token-free manifest", () => {
   assert.match(html, /srcset="\/brand-icon-96\.png 96w, \/brand-icon-192\.png 192w"/);
 });
 
+test("offers a persistent Chinese and English UI switch", () => {
+  const html = renderDashboard({ deviceName: "Test PC", isLocal: true });
+  assert.match(html, /id="language-toggle"/);
+  assert.match(html, /clipbridge\.language\.v1/);
+  assert.match(html, /GitHub handoff repository connected/);
+  assert.match(html, /Create a ClipBridge Agent Handoff summary/);
+  assert.match(html, /new MutationObserver/);
+});
+
 test("renders clipboard and device pairing management for Windows localhost", () => {
   const html = renderDashboard({ deviceName: "Test PC", isLocal: true });
   assert.match(html, /管理端 · Windows 中转/);

@@ -6,6 +6,7 @@ test("the public PWA is subpath-safe and installable", async () => {
   const html = await readFile(new URL("../web/index.html", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../web/manifest.webmanifest", import.meta.url), "utf8"));
   const app = await readFile(new URL("../web/app.js", import.meta.url), "utf8");
+  const i18n = await readFile(new URL("../web/i18n.js", import.meta.url), "utf8");
   assert.match(html, /href="\.\/manifest\.webmanifest"/);
   assert.equal(manifest.start_url, "./");
   assert.equal(manifest.scope, "./");
@@ -14,11 +15,15 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.match(app, /48\*1024/);
   assert.match(app, /rooms\/\$\{code\}\/connect/);
   assert.match(html, /id="room-input"/);
+  assert.match(html, /id="language-toggle"/);
+  assert.match(html, /src="\.\/i18n\.js"/);
+  assert.match(i18n, /clipbridge\.language\.v1/);
+  assert.match(i18n, /Connect two devices directly/);
   assert.doesNotMatch(html, /offer-out|answer-in/);
 });
 
 test("the web build contains the offline shell and PWA icons", async () => {
-  for (const path of ["index.html", "404.html", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png"]) {
+  for (const path of ["index.html", "404.html", "i18n.css", "i18n.js", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png"]) {
     assert.ok((await stat(new URL(`../dist/web/${path}`, import.meta.url))).size > 0, path);
   }
 });

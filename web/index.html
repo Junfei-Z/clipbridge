@@ -9,11 +9,12 @@
   <link rel="icon" href="./assets/favicon.ico">
   <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./i18n.css">
   <title>ClipBridge · 在线直传</title>
 </head>
 <body>
   <main class="shell">
-    <header><img src="./assets/brand-icon-96.png" alt=""><div><h1>ClipBridge</h1><p>在线点对点直传</p></div><span id="status" class="status">未连接</span></header>
+    <header><img src="./assets/brand-icon-96.png" alt=""><div><h1>ClipBridge</h1><p>在线点对点直传</p></div><span id="status" class="status">未连接</span><button id="language-toggle" class="language-toggle" type="button" aria-label="Switch to English">EN</button></header>
 
     <section class="hero">
       <span class="eyebrow">0.6 · WebRTC</span>
@@ -60,6 +61,7 @@
     <footer>ClipBridge 不上传传输内容 · <a href="https://github.com/Junfei-Z/clipbridge">源代码</a></footer>
   </main>
   <script src="./vendor/qrcode.js"></script>
+  <script src="./i18n.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

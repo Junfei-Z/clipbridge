@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Local-first device transfer and GitHub-backed Agent handoff.</strong></p>
 
-<p align="center"><strong>Current release: 0.7.11 · Agent Handoff Beta</strong></p>
+<p align="center"><strong>Current release: 0.7.12 · Agent Handoff Beta</strong></p>
 
 ClipBridge 0.7 combines two focused workflows:
 
@@ -24,6 +24,8 @@ Agent Handoff is the current product direction. It carries committed Git history
 5. On a receiving computer, open the same repository, refresh incoming handoffs, inspect the package, and apply it to a clean working tree.
 
 The **Send handoff** and **Receive handoff** roles are separate in the UI. Existing projects can be safely fast-forwarded from GitHub; dirty, divergent, detached, or unpushed work is never silently overwritten. See [the Agent Handoff guide](docs/agent-handoff.md) for the complete workflow and safety model.
+
+The language control in the top-right corner switches the complete interface between Chinese and English. ClipBridge follows the browser language on first use and remembers the user's choice on that device.
 
 ## Experimental online WebRTC transfer from 0.6
 
