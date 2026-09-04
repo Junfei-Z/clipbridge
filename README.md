@@ -4,15 +4,30 @@
 
 <h1 align="center">ClipBridge</h1>
 
-<p align="center"><strong>A lightweight, local-first clipboard bridge for the devices you already use.</strong></p>
+<p align="center"><strong>Local-first device transfer and GitHub-backed Agent handoff.</strong></p>
 
-ClipBridge transfers text and files between a Windows PC, Mac, iPhone, Android phone, and other devices on the same trusted private network. Version 0.5 lets either Windows or macOS act as the local relay node, while browser interfaces are explicitly modeled as management/endpoint devices. Version 0.7 adds portable Agent Handoff packages for moving unfinished Git work between computers through the user's existing repository. Agent Handoff is computer-only: creating and applying patches requires Git and Node.js; phones and tablets remain text/file endpoints.
+<p align="center"><strong>Current release: 0.7.11 · Agent Handoff Beta</strong></p>
 
-Version 0.6 also provides an HTTPS PWA at `https://junfei-z.github.io/clipbridge/` for encrypted WebRTC text and file transfer between two online browsers. GitHub Pages serves only the static app; transfer content travels over the peer-to-peer DataChannel.
+ClipBridge 0.7 combines two focused workflows:
 
-## Online WebRTC transfer in 0.6
+- **Local relay:** transfer text and files between Windows, Mac, iPhone, Android, and other devices on the same trusted private network. A Windows PC or Mac can be the relay node; browsers are management and endpoint devices.
+- **Agent Handoff Beta:** move unfinished Git work and the context needed to continue it between computers through the user's existing GitHub repository. This workflow is computer-only because creating and applying handoffs requires Git and Node.js.
 
-The 0.6 public WebRTC interface remains available as an experimental feature, but it is no longer the primary product direction. Persistent local-device workflows remain the default.
+## Agent Handoff in 0.7
+
+Agent Handoff is the current product direction. It carries committed Git history, tracked unfinished changes, a structured Markdown summary, and machine-readable state without trying to copy a vendor-specific chat session.
+
+1. On the sending computer, choose an existing Git project or clone one from the signed-in GitHub account.
+2. Confirm the Git, Node.js, project, and GitHub checks are green, then register this computer.
+3. Copy the official prompt to the current coding Agent and paste its completed handoff response back into ClipBridge.
+4. Choose one or more registered receiving computers and publish the handoff.
+5. On a receiving computer, open the same repository, refresh incoming handoffs, inspect the package, and apply it to a clean working tree.
+
+The **Send handoff** and **Receive handoff** roles are separate in the UI. Existing projects can be safely fast-forwarded from GitHub; dirty, divergent, detached, or unpushed work is never silently overwritten. See [the Agent Handoff guide](docs/agent-handoff.md) for the complete workflow and safety model.
+
+## Experimental online WebRTC transfer from 0.6
+
+The public HTTPS PWA at [junfei-z.github.io/clipbridge](https://junfei-z.github.io/clipbridge/) remains available as an experimental feature, but its development is paused after usability evaluation. Persistent LAN transfer and Agent Handoff are the primary workflows in 0.7.
 
 1. Open `https://junfei-z.github.io/clipbridge/` on both devices.
 2. On one device choose **创建连接** to get a temporary 6-digit room code and QR code.
@@ -21,7 +36,7 @@ The 0.6 public WebRTC interface remains available as an experimental feature, bu
 
 The public PWA has no account and no content database. A Cloudflare Durable Object relays only the temporary WebRTC offer and answer; each 6-digit room expires after five minutes and accepts two devices. Text and file contents continue to travel directly between browsers. Some restrictive networks may require a TURN relay; ClipBridge reports connection failure rather than uploading content to an untrusted fallback. See [the online PWA guide](docs/online-pwa.md).
 
-## What works in 0.5
+## Local relay features in 0.7
 
 - Pair an iPhone, iPad, Mac, Android device, or another computer with a one-time 6-digit code or local QR code.
 - Give every paired device an independent 256-bit access key.
@@ -47,7 +62,7 @@ The public PWA has no account and no content database. A Cloudflare Durable Obje
 
 ## Security boundary
 
-Pairing and authorization are device-specific in 0.5, but transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
+Local-relay pairing and authorization are device-specific in 0.7, but LAN transport is still ordinary HTTP and is **not encrypted**. Run ClipBridge only on a trusted private network. Do not expose port `39393` to the internet, use it on public Wi-Fi, or transfer passwords, verification codes, private keys, or sensitive work material.
 
 Pairing codes expire after five minutes, work once, and rate-limit incorrect guesses. QR codes are generated locally; ClipBridge does not send pairing links or clipboard content to a QR service or other cloud service.
 
@@ -149,7 +164,7 @@ ClipBridge does not watch or index every relay clipboard change. History stays o
 
 ## Apple Shortcuts migration
 
-The paired web app is the recommended iPhone experience in 0.3. Existing v0.1 Apple Shortcuts continue to work with the legacy token while users migrate, but named targets and inboxes require secure device pairing. See [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md) for the compatibility setup and its security trade-off.
+The paired web app is the recommended iPhone experience in 0.7. Existing v0.1 Apple Shortcuts continue to work with the legacy token while users migrate, but named targets and inboxes require secure device pairing. See [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md) for the compatibility setup and its security trade-off.
 
 ## API
 
@@ -264,7 +279,7 @@ GET /api/v1/file-outbox
 GET /health
 ```
 
-## Roadmap
+## Release status and roadmap
 
 - **0.2.0:** Device identity, one-time pairing, QR pairing, device management, and revocation.
 - **0.2.1:** Local clipboard history with source and target devices, timestamps, a 50-entry limit, replay/copy, and scoped clear controls.
@@ -273,7 +288,7 @@ GET /health
 - **0.4.1:** One-to-many text/file sending, shared Blobs, and independent per-recipient delivery status.
 - **0.5:** Native Mac relay client with explicit management-device and relay-node roles. Released and verified on Mac hardware.
 - **0.6:** Experimental HTTPS PWA and WebRTC online direct transfer. Released; feature development paused after usability evaluation.
-- **0.7:** Agent Handoff Beta using Git project state plus portable Markdown/JSON/patch packages. See [the Agent Handoff guide](docs/agent-handoff.md).
+- **0.7 (current):** Agent Handoff Beta with GitHub account and repository discovery, safe clone/update flows, registered sending and receiving computers, explicit role-based UI, and portable Markdown/JSON/patch packages. See [the Agent Handoff guide](docs/agent-handoff.md).
 - **Later:** End-to-end encrypted offline relay, revisited only when a concrete workflow requires it.
 
 ## Development
