@@ -149,6 +149,20 @@ img { display: block; max-width: 100%; }
 .note-icon { flex: 0 0 auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #6b45e9; font: 700 13px Georgia,serif; }
 .clarity-note p { display: grid; gap: 5px; font-size: 12px; line-height: 1.6; }
 .clarity-note p span { color: #aaa4b4; }
+.install-requirement { max-width: 980px; margin: 54px auto 0; padding: 22px; border: 1px solid #433b52; border-radius: 20px; background: #211d2b; }
+.requirement-heading { display: grid; grid-template-columns: 110px 1fr; gap: 22px; align-items: start; }
+.requirement-heading > span { width: fit-content; padding: 6px 10px; border-radius: 999px; color: #d5caff; background: #332a4b; font-size: 9px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+.requirement-heading > div { display: grid; gap: 7px; }
+.requirement-heading b { font-size: 15px; }
+.requirement-heading p { max-width: 720px; color: #aaa4b4; font-size: 12px; line-height: 1.65; }
+.install-compare { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.install-compare > span { padding: 14px; display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 11px; border: 1px solid #3d3748; border-radius: 13px; background: #282331; }
+.install-compare > span.active { border-color: #6646c5; background: #2e2743; }
+.install-compare i { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; color: #bca9ff; background: #39304e; font-size: 12px; font-style: normal; font-weight: 900; }
+.install-compare > span.active i { color: #fff; background: var(--purple); }
+.install-compare > span > span { display: grid; gap: 4px; }
+.install-compare b { font-size: 11px; }
+.install-compare small { color: #aaa4b4; font-size: 9px; line-height: 1.5; }
 .privacy { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 100px; }
 .privacy-copy > p:not(.section-kicker) { margin-top: 22px; color: var(--muted); font-size: 15px; line-height: 1.85; }
 .privacy-copy a { display: inline-block; margin-top: 24px; color: var(--purple); font-size: 13px; font-weight: 800; }
@@ -257,4 +271,7 @@ img { display: block; max-width: 100%; }
   .faq { padding-top: 0; }
   .faq-list summary { padding-block: 21px; font-size: 15px; }
   .faq-list details p { padding-right: 4px; }
+  .install-requirement { padding: 18px; }
+  .requirement-heading { grid-template-columns: 1fr; gap: 12px; }
+  .install-compare { grid-template-columns: 1fr; }
 }

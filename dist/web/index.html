@@ -166,6 +166,16 @@
           <h2 data-i18n="howTitle">三步，把正在进行的工作交给下一台电脑。</h2>
           <p data-i18n="howLede">没有隐藏同步，也不伪装成聊天记录迁移。每一步都能看懂、检查和控制。</p>
         </div>
+        <div class="install-requirement">
+          <div class="requirement-heading">
+            <span data-i18n="requirementKicker">开始之前</span>
+            <div><b data-i18n="requirementTitle">Agent Handoff 需要两台电脑都安装 ClipBridge。</b><p data-i18n="requirementBody">发送端负责读取并打包本地项目，接收端负责克隆或更新项目并应用交接包；两端都需要 Git、Node.js 和该 GitHub 仓库的访问权限。</p></div>
+          </div>
+          <div class="install-compare">
+            <span><i>1×</i><span><b data-i18n="localInstallTitle">文字与文件传输</b><small data-i18n="localInstallBody">只需中转电脑安装；手机和其他设备用浏览器配对。</small></span></span>
+            <span class="active"><i>2×</i><span><b data-i18n="agentInstallTitle">Agent Handoff</b><small data-i18n="agentInstallBody">发送电脑与接收电脑都要安装 ClipBridge。</small></span></span>
+          </div>
+        </div>
         <ol class="steps">
           <li><span class="step-number">1</span><div class="step-icon prompt-icon"><span>›_</span></div><h3 data-i18n="step1Title">让 Agent 总结现场</h3><p data-i18n="step1Body">复制 ClipBridge 提供的官方 Prompt，交给当前 Agent；把它的回复粘贴回来。</p></li>
           <li><span class="step-number">2</span><div class="step-icon package-icon"><span>◇</span></div><h3 data-i18n="step2Title">创建并推送交接包</h3><p data-i18n="step2Body">ClipBridge 检查 Git 环境，把代码、修改和上下文整理好，并推送到你的 GitHub 仓库。</p></li>
@@ -233,6 +243,10 @@
         <details>
           <summary><span data-i18n="faq5Question">一定要有 GitHub 账户吗？</span><i aria-hidden="true">+</i></summary>
           <p data-i18n="faq5Answer">局域网文字和文件传输不需要账户。只有 Agent Handoff 需要 GitHub，因为它把 GitHub 当作两台电脑都能访问的项目来源；使用这部分功能时，电脑还需要安装 Git 与 Node.js。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq8Question">Agent Handoff 需要两台电脑都安装 ClipBridge 吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq8Answer">需要。发送电脑上的 ClipBridge 要读取本地 Git 项目并创建交接包，接收电脑上的 ClipBridge 要安全地克隆或更新项目、验证并应用交接内容。两台电脑都需要 Git、Node.js 和目标 GitHub 仓库的访问权限。相比之下，普通文字和文件传输只需要中转电脑安装 ClipBridge，其他设备可以直接使用浏览器。</p>
         </details>
         <details>
           <summary><span data-i18n="faq6Question">手机也能使用 Agent Handoff 吗？</span><i aria-hidden="true">+</i></summary>
