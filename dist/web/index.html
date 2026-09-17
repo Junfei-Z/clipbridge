@@ -35,6 +35,7 @@
       <a href="#workflows" data-i18n="navWorkflows">能力</a>
       <a href="#how" data-i18n="navHow">工作方式</a>
       <a href="#download" data-i18n="navDownload">下载</a>
+      <a href="#faq" data-i18n="navFaq">常见问题</a>
       <a href="https://github.com/Junfei-Z/clipbridge" target="_blank" rel="noreferrer">GitHub</a>
     </nav>
     <div class="nav-actions">
@@ -204,6 +205,44 @@
         </div>
       </div>
       <p class="experimental"><span data-i18n="experimentalLabel">实验性功能</span> · <span data-i18n="experimentalBody">公网 WebRTC 在线直传仍可使用，但当前主要开发方向是局域网传输与 Agent Handoff。</span></p>
+    </section>
+
+    <section id="faq" class="faq section-shell section-block">
+      <div class="faq-heading">
+        <p class="section-kicker" data-i18n="faqKicker">常见问题</p>
+        <h2 data-i18n="faqTitle">先把容易困惑的地方讲清楚。</h2>
+        <p data-i18n="faqLede">ClipBridge 有两条相互独立、又能共同服务于跨设备工作的产品线。</p>
+      </div>
+      <div class="faq-list">
+        <details open>
+          <summary><span data-i18n="faq1Question">它本质上不是文件传输吗，为什么又涉及 Agent？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq1Answer">因为 ClipBridge 实际上有两条线。第一条是局域网文字与文件传输，解决“把内容送到另一台设备”；第二条是 Agent Handoff，解决“把一个尚未完成的软件项目在另一台电脑上继续”。前者传内容，后者传递代码与可继续工作的上下文，两者可以分别使用。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq2Question">使用时必须连接同一个局域网吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq2Answer">使用文字和文件的本地直传时，两台设备需要在同一个可互相访问的局域网中。Agent Handoff 不要求同一网络，因为代码与交接包通过你自己的 GitHub 仓库同步。实验性的 WebRTC 在线直传可以跨网络，但在部分受限网络中可能无法建立直连。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq3Question">ClipBridge 会把我的文件上传到自己的服务器吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq3Answer">不会。局域网传输的文字和文件只在你的设备之间流动；Agent Handoff 只使用你明确选择的 GitHub 仓库。实验性 WebRTC 模式的服务端仅交换临时连接信息，不接收传输内容。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq4Question">它能把 Codex、Claude Code 等产品的完整聊天 Session 搬走吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq4Answer">不能，也不会伪装成能够做到。不同 Agent 的专有 Session 格式通常不可移植。ClipBridge 传递的是继续工作真正需要的内容：Git 历史、未提交修改、当前目标、已经做出的决定、已知问题和下一步计划，并使用开放的 Markdown、JSON 与 patch 文件保存。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq5Question">一定要有 GitHub 账户吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq5Answer">局域网文字和文件传输不需要账户。只有 Agent Handoff 需要 GitHub，因为它把 GitHub 当作两台电脑都能访问的项目来源；使用这部分功能时，电脑还需要安装 Git 与 Node.js。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq6Question">手机也能使用 Agent Handoff 吗？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq6Answer">手机可以参与文字和文件传输，但 Agent Handoff 目前只支持 Mac 和 Windows 电脑，因为它需要读取本地项目目录，并运行 Git 与 Node.js 命令。网页界面会明确标出哪些功能属于电脑端。</p>
+        </details>
+        <details>
+          <summary><span data-i18n="faq7Question">接收项目时，会不会覆盖另一台电脑上的本地修改？</span><i aria-hidden="true">+</i></summary>
+          <p data-i18n="faq7Answer">不会静默覆盖。如果目标目录存在未提交修改、分叉历史、detached HEAD 或尚未推送的提交，ClipBridge 会停止更新并说明原因，让你先处理冲突或选择其他目录。</p>
+        </details>
+      </div>
     </section>
   </main>
 

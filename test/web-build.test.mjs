@@ -12,6 +12,7 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.match(landing, /href="\.\/transfer\.html"/);
   assert.match(landing, /property="og:image"/);
   assert.match(landing, /id="language-toggle"/);
+  assert.match(landing, /id="faq"/);
   assert.equal(manifest.start_url, "./transfer.html");
   assert.equal(manifest.scope, "./");
   assert.match(app, /RTCPeerConnection/);
