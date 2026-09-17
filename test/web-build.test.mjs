@@ -3,12 +3,16 @@ import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 test("the public PWA is subpath-safe and installable", async () => {
-  const html = await readFile(new URL("../web/index.html", import.meta.url), "utf8");
+  const landing = await readFile(new URL("../web/index.html", import.meta.url), "utf8");
+  const html = await readFile(new URL("../web/transfer.html", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../web/manifest.webmanifest", import.meta.url), "utf8"));
   const app = await readFile(new URL("../web/app.js", import.meta.url), "utf8");
   const i18n = await readFile(new URL("../web/i18n.js", import.meta.url), "utf8");
-  assert.match(html, /href="\.\/manifest\.webmanifest"/);
-  assert.equal(manifest.start_url, "./");
+  assert.match(landing, /href="\.\/manifest\.webmanifest"/);
+  assert.match(landing, /href="\.\/transfer\.html"/);
+  assert.match(landing, /property="og:image"/);
+  assert.match(landing, /id="language-toggle"/);
+  assert.equal(manifest.start_url, "./transfer.html");
   assert.equal(manifest.scope, "./");
   assert.match(app, /RTCPeerConnection/);
   assert.match(app, /SHA-256/);
@@ -23,7 +27,7 @@ test("the public PWA is subpath-safe and installable", async () => {
 });
 
 test("the web build contains the offline shell and PWA icons", async () => {
-  for (const path of ["index.html", "404.html", "i18n.css", "i18n.js", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png"]) {
+  for (const path of ["index.html", "404.html", "landing.css", "landing.js", "transfer.html", "i18n.css", "i18n.js", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png", "assets/social-card.png"]) {
     assert.ok((await stat(new URL(`../dist/web/${path}`, import.meta.url))).size > 0, path);
   }
 });

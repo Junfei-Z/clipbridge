@@ -31,9 +31,9 @@ Agent Handoff 是 ClipBridge 当前的主要产品方向。它会传递已经提
 
 ## 0.6 实验性在线 WebRTC 直传
 
-[junfei-z.github.io/clipbridge](https://junfei-z.github.io/clipbridge/) 上的公开 HTTPS PWA 仍然可以使用，但经过可用性评估后已经暂停继续开发。0.7 的主要方向是稳定的局域网传输和 Agent Handoff。
+[ClipBridge 项目介绍页](https://junfei-z.github.io/clipbridge/)展示了当前的局域网传输与 Agent Handoff 工作流。公开 HTTPS [WebRTC 在线直传工具](https://junfei-z.github.io/clipbridge/transfer.html)仍然可以使用，但经过可用性评估后已经暂停继续开发。
 
-1. 在两台设备上打开 `https://junfei-z.github.io/clipbridge/`。
+1. 在两台设备上打开 `https://junfei-z.github.io/clipbridge/transfer.html`。
 2. 在其中一台设备上点击**创建连接**，获得临时六位房间码和二维码。
 3. 在另一台设备上点击**加入连接**，输入房间码或扫描二维码。
 4. 两边均显示**已直连**后，即可双向发送文字和文件。

@@ -1,6 +1,6 @@
 # ClipBridge 0.6 online PWA
 
-Open `https://junfei-z.github.io/clipbridge/` in a current Safari, Chrome, Edge, or Firefox browser. Installation from the browser menu is optional.
+Open `https://junfei-z.github.io/clipbridge/transfer.html` in a current Safari, Chrome, Edge, or Firefox browser. Installation from the browser menu is optional. The project introduction remains at `https://junfei-z.github.io/clipbridge/`.
 
 ## Connect two devices
 

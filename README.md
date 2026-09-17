@@ -31,9 +31,9 @@ The language control in the top-right corner switches the complete interface bet
 
 ## Experimental online WebRTC transfer from 0.6
 
-The public HTTPS PWA at [junfei-z.github.io/clipbridge](https://junfei-z.github.io/clipbridge/) remains available as an experimental feature, but its development is paused after usability evaluation. Persistent LAN transfer and Agent Handoff are the primary workflows in 0.7.
+The [ClipBridge project site](https://junfei-z.github.io/clipbridge/) introduces the current local-transfer and Agent Handoff workflows. Its public HTTPS [WebRTC transfer tool](https://junfei-z.github.io/clipbridge/transfer.html) remains available as an experimental feature, but development is paused after usability evaluation.
 
-1. Open `https://junfei-z.github.io/clipbridge/` on both devices.
+1. Open `https://junfei-z.github.io/clipbridge/transfer.html` on both devices.
 2. On one device choose **Create connection** to get a temporary 6-digit room code and QR code.
 3. On the other device choose **Join connection** and enter the room code, or scan the QR code.
 4. When both pages show **Directly connected**, send text or files in either direction.

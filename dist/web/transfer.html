@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#6738f4">
+  <meta name="description" content="ClipBridge WebRTC 点对点文字与文件直传">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/favicon.ico">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./i18n.css">
+  <title>ClipBridge · 在线直传</title>
+</head>
+<body>
+  <main class="shell">
+    <header><a class="transfer-brand" href="./"><img src="./assets/brand-icon-96.png" alt=""><div><h1>ClipBridge</h1><p>在线点对点直传</p></div></a><span id="status" class="status">未连接</span><a class="site-link" href="./">项目介绍</a><button id="language-toggle" class="language-toggle" type="button" aria-label="Switch to English">EN</button></header>
+
+    <section class="hero">
+      <span class="eyebrow">0.6 · WebRTC</span>
+      <h2>让两台设备直接连接</h2>
+      <p>页面只负责建立连接。文字和文件通过加密的 WebRTC DataChannel 在设备之间传输。</p>
+    </section>
+
+    <section class="card" id="connect-card">
+      <div class="section-title"><span>1</span><div><h3>建立连接</h3><p>创建一个 6 位临时房间码，另一台设备输入后自动直连。</p></div></div>
+      <div class="choice-row">
+        <button id="create" class="primary">创建连接</button>
+        <button id="join">加入连接</button>
+        <button id="disconnect" class="danger" disabled>断开</button>
+      </div>
+      <div id="creator-flow" class="flow" hidden>
+        <p class="hint">让另一台设备扫描二维码，或输入下面的房间码。房间 5 分钟后失效。</p>
+        <div class="room-share"><div><span class="room-label">房间码</span><output id="room-code">······</output><button id="copy-room">复制房间码</button></div><div id="room-qr" class="qr" aria-label="房间二维码"></div></div>
+      </div>
+      <div id="joiner-flow" class="flow" hidden>
+        <label for="room-input">输入另一台设备上的 6 位房间码</label>
+        <input id="room-input" class="room-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+        <button id="join-room" class="primary">加入房间</button>
+      </div>
+      <p id="connect-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="card disabled" id="transfer-card">
+      <div class="section-title"><span>2</span><div><h3>发送内容</h3><p>连接成功后可以双向发送文字和文件。</p></div></div>
+      <label for="text">文字</label>
+      <textarea id="text" placeholder="输入要发送的文字"></textarea>
+      <button id="send-text" class="primary" disabled>发送文字</button>
+      <div class="divider"></div>
+      <label for="files">文件</label>
+      <input id="files" type="file" multiple disabled>
+      <button id="send-files" disabled>发送所选文件</button>
+      <progress id="progress" max="100" value="0" hidden></progress>
+      <p id="transfer-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section class="card">
+      <div class="section-title"><span>3</span><div><h3>收到的内容</h3><p>内容只保留在当前页面；刷新页面后清空。</p></div></div>
+      <div id="inbox" class="inbox"><p class="empty">还没有收到内容</p></div>
+    </section>
+    <footer>ClipBridge 不上传传输内容 · <a href="https://github.com/Junfei-Z/clipbridge">源代码</a></footer>
+  </main>
+  <script src="./vendor/qrcode.js"></script>
+  <script src="./i18n.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
