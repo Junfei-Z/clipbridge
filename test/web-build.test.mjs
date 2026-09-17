@@ -14,6 +14,8 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.match(landing, /id="language-toggle"/);
   assert.match(landing, /id="faq"/);
   assert.match(landing, /Agent Handoff 需要两台电脑都安装 ClipBridge/);
+  assert.match(landing, /Start-ClipBridge-Mac\.command/);
+  assert.match(landing, /Start-ClipBridge-Tray\.cmd/);
   assert.equal(manifest.start_url, "./transfer.html");
   assert.equal(manifest.scope, "./");
   assert.match(app, /RTCPeerConnection/);
