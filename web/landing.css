@@ -87,7 +87,7 @@ img { display: block; max-width: 100%; }
 .float-card > span { display: grid; gap: 2px; }
 .float-card b { font-size: 10px; }
 .float-card small { color: #9993a4; font-size: 8px; }
-.float-one { top: -23px; right: 24px; }
+.float-one { top: 8px; right: 72px; }
 .float-two { bottom: -24px; left: 15px; }
 .float-two > i { color: var(--purple); background: var(--purple-light); }
 .trust-strip { min-height: 110px; display: flex; align-items: center; gap: 50px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -240,7 +240,7 @@ img { display: block; max-width: 100%; }
   .machine { width: 78%; }
   .target-machine { margin-top: 58px; }
   .bridge-progress { top: 162px; }
-  .float-one { top: -22px; right: 8px; }
+  .float-one { top: 6px; right: 48px; }
   .float-two { left: 6px; }
   .trust-strip ul { grid-template-columns: 1fr; }
   .section-block { padding-block: 88px; }
