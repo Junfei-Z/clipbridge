@@ -13,6 +13,8 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.match(landing, /property="og:image"/);
   assert.match(landing, /id="language-toggle"/);
   assert.match(landing, /id="faq"/);
+  assert.match(landing, /id="demo"/);
+  assert.match(landing, /media\/clipbridge-demo\.mp4/);
   assert.match(landing, /Agent Handoff 需要两台电脑都安装 ClipBridge/);
   assert.match(landing, /Start-ClipBridge-Mac\.command/);
   assert.match(landing, /Start-ClipBridge-Tray\.cmd/);
@@ -30,8 +32,8 @@ test("the public PWA is subpath-safe and installable", async () => {
   assert.doesNotMatch(html, /offer-out|answer-in/);
 });
 
-test("the web build contains the offline shell and PWA icons", async () => {
-  for (const path of ["index.html", "404.html", "landing.css", "landing.js", "transfer.html", "i18n.css", "i18n.js", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png", "assets/social-card.png"]) {
+test("the web build contains the offline shell, demo, and PWA icons", async () => {
+  for (const path of ["index.html", "404.html", "landing.css", "landing.js", "transfer.html", "i18n.css", "i18n.js", "app.js", "sw.js", "vendor/qrcode.js", "manifest.webmanifest", "assets/icon-192.png", "assets/icon-512.png", "assets/social-card.png", "media/clipbridge-demo.mp4", "media/clipbridge-demo-poster.jpg"]) {
     assert.ok((await stat(new URL(`../dist/web/${path}`, import.meta.url))).size > 0, path);
   }
 });
